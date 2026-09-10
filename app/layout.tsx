@@ -1,52 +1,51 @@
 import type { Metadata, Viewport } from "next";
-import type { ReactNode } from "react";
+import { Geist } from "next/font/google";
+import "./globals.css";
+import { AppProvidersClient } from "@/providers/app-providers-client";
 
-const APP_NAME = "NJS App";
-const APP_DESCRIPTION = "Next.js + Serwist PWA";
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
-  applicationName: APP_NAME,
-  title: {
-    default: APP_NAME,
-    template: "%s - NJS App",
-  },
-  description: APP_DESCRIPTION,
+  title: "Ruma",
+  description: "Buy and sell USDC with your local currency.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: APP_NAME,
-  },
-  formatDetection: {
-    telephone: false,
+    title: "Ruma",
   },
   icons: {
-    shortcut: "/favicon.ico",
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+    icon: "/icons/icon-512x512.png",
+    apple: "/icons/apple-touch-icon.png",
   },
 };
 
+// Privy's SDK touches browser-only globals during its client render; every
+// route sits under AppProviders (PrivyProvider), so static prerendering of
+// any page fails at build time without opting the whole tree out of it.
+export const dynamic = "force-dynamic";
+
 export const viewport: Viewport = {
-  themeColor: "#FFFFFF",
+  themeColor: "#0057ff",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" dir="ltr">
-      <head>
-        <style>{`
-            html, body, #__next {
-              height: 100%;
-            }
-            #__next {
-              margin: 0 auto;
-            }
-            h1 {
-              text-align: center;
-            }
-            `}</style>
-      </head>
-      <body>{children}</body>
+    <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-background text-text">
+        <AppProvidersClient>
+          <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background">
+            {children}
+          </div>
+        </AppProvidersClient>
+      </body>
     </html>
   );
 }
