@@ -11,16 +11,22 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@privy-io/react-auth": "^3.38.0",
     "@serwist/next": "latest",
+    "clsx": "^2.1.1",
+    "input-otp": "^1.5.0",
+    "lucide-react": "^1.34.0",
     "next": "16.2.10",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "serwist": "latest"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4",
     "@types/node": "26.1.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
+    "tailwindcss": "^4",
     "typescript": "npm:@typescript/typescript6@6.0.2"
   }
 }
