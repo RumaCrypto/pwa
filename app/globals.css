@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+/* Ported 1:1 from ruma-web's app/globals.css so this PWA matches the
+   existing brand. Mirrored in constants/colors.ts — keep both in sync. */
+@theme {
+  --color-background: #fafafa;
+  --color-primary: #0057ff;
+  --color-primary-light: #e6eeff;
+
+  --color-text: #001610;
+  --color-text-secondary: #999;
+  --color-text-tertiary: #666;
+  --color-text-disabled: #555;
+  --color-text-muted: #8a8a8a;
+
+  --color-card: #ededed;
+  --color-card-dark: #2c2c2c;
+
+  --color-border: #333;
+  --color-border-dark: #2a2a2a;
+  --color-border-light: #ededed;
+
+  --color-success: #4caf50;
+  --color-danger: #ff3b30;
+  --color-warning: #ff9500;
+  --color-error: #ff6b6b;
+
+  --color-overlay: rgba(0, 0, 0, 0.7);
+  --color-warning-background: rgba(255, 149, 0, 0.1);
+  --color-warning-border: rgba(255, 149, 0, 0.3);
+  --color-danger-background: rgba(255, 59, 48, 0.1);
+  --color-danger-border: rgba(255, 59, 48, 0.3);
+  --color-tinted-background: rgba(30, 144, 255, 0.1);
+
+  --color-mint-light: #e6faf0;
+  --color-yellow: #dfff00;
+  --color-magenta: #ff00ff;
+
+  --color-black: #111111;
+  --color-white: #fff;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
