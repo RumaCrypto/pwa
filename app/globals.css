@@ -6,12 +6,14 @@
   --color-background: #fafafa;
   --color-primary: #0057ff;
   --color-primary-light: #e6eeff;
+  --color-primary-dark: #0a1f5c;
 
   --color-text: #001610;
   --color-text-secondary: #999;
   --color-text-tertiary: #666;
   --color-text-disabled: #555;
   --color-text-muted: #8a8a8a;
+  --color-text-lightblue: #9fb4f5;
 
   --color-card: #ededed;
   --color-card-dark: #2c2c2c;

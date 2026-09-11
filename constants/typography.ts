@@ -38,6 +38,9 @@ export const typography = {
   body6: { fontSize: "11px", lineHeight: "16px", letterSpacing: "0px", fontWeight: 400 },
   body7: { fontSize: "10px", lineHeight: "14px", letterSpacing: "0px", fontWeight: 400 },
 
+  // ── Body ──────────────────────────────────────────────
+  extralight1: { fontSize: "12.5px", lineHeight: "14px", letterSpacing: "0px", fontWeight: 200 },
+
   // ── Label ─────────────────────────────────────────────
   label1: { fontSize: "16px", lineHeight: "20px", letterSpacing: "0px", fontWeight: 600 },
   label2: { fontSize: "15px", lineHeight: "20px", letterSpacing: "0px", fontWeight: 600 },
