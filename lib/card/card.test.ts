@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SETUP_STEPS, canSpend, isProvisioned, nextSetupStep, type CardSetup } from "./card";
+import { SETUP_STEPS, canSpend, nextSetupStep, type CardSetup } from "./card";
 
 const blank: CardSetup = { kyc: "not_started", endorsement: "not_requested" };
 
@@ -50,13 +50,6 @@ describe("nextSetupStep", () => {
 
   it("lists the steps in the order it returns them", () => {
     expect(SETUP_STEPS).toEqual(["kyc", "endorsement", "approval", "create"]);
-  });
-});
-
-describe("isProvisioned", () => {
-  it("is true only when a card object exists", () => {
-    expect(isProvisioned(blank)).toBe(false);
-    expect(isProvisioned({ ...blank, card })).toBe(true);
   });
 });
 

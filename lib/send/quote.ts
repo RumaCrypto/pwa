@@ -1,4 +1,4 @@
-import { CURRENCIES, type CurrencyCode } from "@/lib/money/currencies";
+import type { CurrencyCode } from "@/lib/money/currencies";
 import { add, convert, fromMinor, type Money } from "@/lib/money/money";
 
 /** 0.6% — $1.20 on the $200 send shown in the designs. */
@@ -50,8 +50,4 @@ export function isExpired(quote: Quote, now: Date = new Date()): boolean {
 
 export function secondsLeft(quote: Quote, now: Date = new Date()): number {
   return Math.max(0, Math.ceil((quote.expiresAt.getTime() - now.getTime()) / 1000));
-}
-
-export function decimalsOf(currency: CurrencyCode): number {
-  return CURRENCIES[currency].decimals;
 }

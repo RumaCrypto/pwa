@@ -73,7 +73,10 @@ export default function HomePage() {
           <button onClick={() => router.push("/pay")}>
             <Badge variant="dark">{t("home.scanQr")}</Badge>
           </button>
-          <Badge variant="outline">{t("tabs.help")}</Badge>
+          {/* Dimmed rather than live: there is no help screen behind it yet. */}
+          <Badge variant="outline" className="opacity-50">
+            {t("tabs.help")}
+          </Badge>
           <button
             onClick={() => router.push("/settings")}
             aria-label={t("settings")}

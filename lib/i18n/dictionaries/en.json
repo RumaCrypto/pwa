@@ -538,5 +538,9 @@
   "card.details.warning": "These are placeholder values. Real card numbers are shown by the issuer, never handled by this app.",
   "card.details.close": "Close",
   "card.applePay.soon": "Apple Pay is not available yet.",
-  "card.limit.edit": "Change limit"
+  "card.limit.edit": "Change limit",
+  "sendFlow.track.cancelled": "Transfer cancelled",
+  "sendFlow.track.cancelledHint": "The money stayed in your balance. Nothing was sent to {name}.",
+  "sendFlow.track.cancelling": "Cancelling...",
+  "payFlow.track.reportSoon": "Support is not available yet."
 }

@@ -110,12 +110,10 @@ export default function PayTrackingScreen() {
           <Button variant="secondary" onClick={() => router.replace("/home")}>
             {t("payFlow.track.backHome")}
           </Button>
-          <button
-            style={typography.body3}
-            className="mt-3 w-full text-center text-text-secondary active:opacity-70"
-          >
-            {t("payFlow.track.report")}
-          </button>
+          {/* No support channel exists yet; showing it as live would be a lie. */}
+          <p style={typography.body3} className="mt-3 text-center text-text-disabled">
+            {t("payFlow.track.report")} · {t("payFlow.track.reportSoon")}
+          </p>
         </>
       }
     >

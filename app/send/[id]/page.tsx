@@ -18,14 +18,14 @@ import { countryName, displayName } from "@/lib/contacts/contacts";
 import { useSend } from "@/lib/send/send-context";
 import { useMoney } from "@/lib/money/money-context";
 import { formatTime } from "@/lib/datetime";
-import { STAGES, estimatedArrival, progressAt, stageAt, stageStateAt, type Order } from "@/lib/send/orders";
+import { STAGES, canCancel, estimatedArrival, progressAt, stageAt, stageStateAt, type Order } from "@/lib/send/orders";
 
 export default function SendTrackingScreen() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const { t, language } = useI18n();
   const { findContact } = useContacts();
-  const { getOrder } = useSend();
+  const { getOrder, cancelOrder } = useSend();
   const { format } = useMoney();
 
   const [order, setOrder] = useState<Order | null | undefined>(undefined);
@@ -59,7 +59,10 @@ export default function SendTrackingScreen() {
 
   const contact = findContact(order.contactId);
   const name = contact ? displayName(contact) : t("common.to");
-  const stage = stageAt(order.createdAt, now);
+  const stage = stageAt(order.createdAt, now, order.cancelledAt);
+  const cancelled = Boolean(order.cancelledAt);
+
+  const handleCancel = () => setOrder(cancelOrder(order.id) ?? order);
   const arrival = estimatedArrival(order.createdAt);
 
   const stageHints: Record<(typeof STAGES)[number], string> = {
@@ -80,11 +83,11 @@ export default function SendTrackingScreen() {
           <Button variant="secondary" onClick={() => router.replace("/home")}>
             {t("sendFlow.track.backHome")}
           </Button>
-          {stage !== "delivered" && (
+          {canCancel(order, now) && (
             <button
-              onClick={() => router.replace("/home")}
+              onClick={handleCancel}
               style={typography.body3}
-              className="mt-3 w-full text-center text-text-secondary active:opacity-70"
+              className="mt-3 w-full text-center text-danger active:opacity-70"
             >
               {t("sendFlow.track.cancel")}
             </button>
@@ -94,16 +97,21 @@ export default function SendTrackingScreen() {
     >
       <StatusCard
         label={
-          stage === "delivered"
-            ? t("sendFlow.track.delivered", { name })
-            : t("sendFlow.track.onItsWay", { name })
+          cancelled
+            ? t("sendFlow.track.cancelled")
+            : stage === "delivered"
+              ? t("sendFlow.track.delivered", { name })
+              : t("sendFlow.track.onItsWay", { name })
         }
-        progress={progressAt(order.createdAt, now)}
+        progress={cancelled ? undefined : progressAt(order.createdAt, now)}
         caption={
-          stage === "delivered"
-            ? undefined
-            : t("sendFlow.track.arrivesBy", { time: formatTime(arrival, language) })
+          cancelled
+            ? t("sendFlow.track.cancelledHint", { name })
+            : stage === "delivered"
+              ? undefined
+              : t("sendFlow.track.arrivesBy", { time: formatTime(arrival, language) })
         }
+        className={cancelled ? "bg-text-tertiary" : undefined}
       >
         <p style={typography.display4}>
           {format(order.quote.receive, { symbol: false })}
@@ -119,7 +127,11 @@ export default function SendTrackingScreen() {
                 ? t(`sendFlow.stage.${key}`, { name })
                 : t(`sendFlow.stage.${key}`),
             subtitle: stageHints[key],
-            state: stageStateAt(key, order.createdAt, now),
+            state: cancelled
+              ? stageStateAt(key, order.createdAt, order.cancelledAt!) === "current"
+                ? "pending"
+                : stageStateAt(key, order.createdAt, order.cancelledAt!)
+              : stageStateAt(key, order.createdAt, now),
           }))}
         />
       </div>

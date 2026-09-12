@@ -20,7 +20,7 @@ import { useConverted, useMoney } from "@/lib/money/money-context";
 import { useUsdcBalance } from "@/hooks/use-usdc-balance";
 import { fromDecimalString, fromMinor } from "@/lib/money/money";
 import { useCard } from "@/lib/card/card-context";
-import { SETUP_STEPS, formatExpiry, nextSetupStep, type SetupStep } from "@/lib/card/card";
+import { SETUP_STEPS, canSpend, formatExpiry, nextSetupStep } from "@/lib/card/card";
 import type { CardSecrets } from "@/lib/card/card-provider";
 
 export default function CardScreen() {
@@ -106,7 +106,7 @@ function ProvisionedCard() {
   const card = setup?.card;
   if (!card || !controls) return null;
 
-  const frozen = card.status === "frozen";
+  const frozen = !canSpend(card);
 
   const handleReveal = async () => {
     setRevealing(true);

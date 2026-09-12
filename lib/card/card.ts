@@ -50,10 +50,6 @@ export function nextSetupStep(setup: CardSetup): SetupStep | null {
   return null;
 }
 
-export function isProvisioned(setup: CardSetup): boolean {
-  return Boolean(setup.card);
-}
-
 export function canSpend(card: Card): boolean {
   return card.status === "active";
 }

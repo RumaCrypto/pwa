@@ -28,13 +28,24 @@ export function stageIndex(stage: Stage): number {
   return STAGES.indexOf(stage);
 }
 
-export function stageAt(createdAt: Date, now: Date = new Date()): Stage {
-  const elapsed = (now.getTime() - createdAt.getTime()) / 1000;
+/**
+ * A cancelled order freezes at whatever stage it had reached, so the screen
+ * keeps showing how far the money got rather than pretending it continued.
+ */
+export function stageAt(createdAt: Date, now: Date = new Date(), cancelledAt?: Date): Stage {
+  const at = cancelledAt && cancelledAt < now ? cancelledAt : now;
+  const elapsed = (at.getTime() - createdAt.getTime()) / 1000;
+
   let reached: Stage = "funded";
   for (const stage of STAGES) {
     if (elapsed >= STAGE_AT_SECONDS[stage]) reached = stage;
   }
   return reached;
+}
+
+/** Cancelling is only meaningful while something is still in flight. */
+export function canCancel(order: Order, now: Date = new Date()): boolean {
+  return !order.cancelledAt && stageAt(order.createdAt, now) !== "delivered";
 }
 
 export function stageStateAt(stage: Stage, createdAt: Date, now: Date = new Date()): TimelineStepState {

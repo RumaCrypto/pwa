@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { newOrderId, type Order } from "./orders";
+import { canCancel, newOrderId, type Order } from "./orders";
 import type { Quote } from "./quote";
 
 const ORDERS_KEY = "ruma-orders";
@@ -17,6 +17,8 @@ interface SendContextType {
   setQuote: (quote: Quote | null) => void;
   placeOrder: (quote: Quote, contactId: string) => Order;
   getOrder: (id: string) => Order | undefined;
+  /** Stops an in-flight transfer and returns the updated order. */
+  cancelOrder: (id: string) => Order | undefined;
   reset: () => void;
 }
 
@@ -85,6 +87,16 @@ export function SendProvider({ children }: { children: ReactNode }) {
 
   const getOrder = useCallback((id: string) => readOrders().find((order) => order.id === id), []);
 
+  const cancelOrder = useCallback((id: string) => {
+    const orders = readOrders();
+    const index = orders.findIndex((order) => order.id === id);
+    if (index === -1 || !canCancel(orders[index])) return orders[index];
+
+    orders[index] = { ...orders[index], cancelledAt: new Date() };
+    writeOrders(orders);
+    return orders[index];
+  }, []);
+
   const reset = useCallback(() => {
     setContactId(null);
     setDraft("");
@@ -92,8 +104,8 @@ export function SendProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ contactId, setContactId, draft, setDraft, quote, setQuote, placeOrder, getOrder, reset }),
-    [contactId, draft, quote, placeOrder, getOrder, reset]
+    () => ({ contactId, setContactId, draft, setDraft, quote, setQuote, placeOrder, getOrder, cancelOrder, reset }),
+    [contactId, draft, quote, placeOrder, getOrder, cancelOrder, reset]
   );
 
   return <SendContext.Provider value={value}>{children}</SendContext.Provider>;

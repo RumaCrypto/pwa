@@ -538,5 +538,9 @@
   "card.details.warning": "Estes valores são de preenchimento. Os números reais são exibidos pelo emissor; este app nunca os manipula.",
   "card.details.close": "Fechar",
   "card.applePay.soon": "Apple Pay ainda não está disponível.",
-  "card.limit.edit": "Alterar limite"
+  "card.limit.edit": "Alterar limite",
+  "sendFlow.track.cancelled": "Envio cancelado",
+  "sendFlow.track.cancelledHint": "O dinheiro ficou no seu saldo. Nada foi enviado para {name}.",
+  "sendFlow.track.cancelling": "Cancelando...",
+  "payFlow.track.reportSoon": "O suporte ainda não está disponível."
 }
