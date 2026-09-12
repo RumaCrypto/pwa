@@ -11,10 +11,12 @@ interface StatusCardProps {
   caption?: ReactNode;
   /** 0 to 1; shown between the headline and the caption. */
   progress?: number;
+  /** Sits below a hairline rule at the bottom of the card. */
+  footer?: ReactNode;
   className?: string;
 }
 
-export function StatusCard({ label, children, caption, progress, className }: StatusCardProps) {
+export function StatusCard({ label, children, caption, progress, footer, className }: StatusCardProps) {
   return (
     <div className={clsx("rounded-3xl bg-primary-dark px-6 py-6 text-white", className)}>
       {label && (
@@ -30,6 +32,15 @@ export function StatusCard({ label, children, caption, progress, className }: St
       {caption && (
         <p style={typography.extralight1} className="mt-3 font-extralight text-text-lightblue">
           {caption}
+        </p>
+      )}
+
+      {footer && (
+        <p
+          style={typography.label4}
+          className="mt-5 border-t border-white/15 pt-4 text-text-lightblue"
+        >
+          {footer}
         </p>
       )}
     </div>

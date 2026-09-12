@@ -22,8 +22,22 @@ function formatter(money: Money, language: Language, { symbol = true }: FormatOp
   });
 }
 
+/**
+ * es-CO renders "$ 1.080,50" with a non-breaking space after the symbol, but the
+ * designs set the symbol tight against the digits — and `formatMoneyParts`
+ * already drops it, so leaving it here made the same amount render two ways.
+ */
 export function formatMoney(money: Money, language: Language, options?: FormatOptions): string {
-  return formatter(money, language, options).format(toNumber(money));
+  const parts = formatter(money, language, options).formatToParts(toNumber(money));
+
+  return parts
+    .filter((part, index) => {
+      if (part.type !== "literal") return true;
+      const neighbours = [parts[index - 1]?.type, parts[index + 1]?.type];
+      return !neighbours.includes("currency");
+    })
+    .map((part) => part.value)
+    .join("");
 }
 
 /**

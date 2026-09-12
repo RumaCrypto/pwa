@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { typography } from "@/constants/typography";
+import { initialsFrom } from "@/lib/format";
 
 type Size = "sm" | "md" | "lg";
 
@@ -16,13 +17,6 @@ const SIZES: Record<Size, { box: string; text: keyof typeof typography }> = {
   md: { box: "h-12 w-12", text: "heading4" },
   lg: { box: "h-14 w-14", text: "heading3" },
 };
-
-function initialsFrom(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "?";
-  if (words.length === 1) return words[0][0].toUpperCase();
-  return (words[0][0] + words[1][0]).toUpperCase();
-}
 
 export function Avatar({ name, initials, size = "md", className }: AvatarProps) {
   const { box, text } = SIZES[size];

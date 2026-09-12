@@ -76,7 +76,8 @@ export default function HomePage() {
           <StatusCard
             key="balance"
             label={t("home.balance.label")}
-            caption={t("home.balance.footer")}
+            caption={t("home.balance.caption")}
+            footer={t("home.balance.footer")}
             className="min-h-44"
           >
             <p style={typography.display1} className={clsx(pending && "opacity-60")}>
@@ -86,9 +87,6 @@ export default function HomePage() {
                 {decimal}
                 {fraction}
               </small>
-            </p>
-            <p style={typography.extralight1} className="mt-1 font-extralight text-text-lightblue">
-              {t("home.balance.caption")}
             </p>
           </StatusCard>,
           <PaymentCard key="card" last4="4417" kind={t("home.card.debit")} className="min-h-44" />,
@@ -109,7 +107,8 @@ export default function HomePage() {
         </ContactButton>
         {contacts.map((contact) => (
           <ContactButton key={contact.id} label={shortNameOf(contact)}>
-            <Avatar name={contact.name} initials={contact.initials} />
+            {/* Initials come from the short name, so "Rosa Cedeño" is R, not RC. */}
+            <Avatar name={shortNameOf(contact)} initials={contact.initials} />
           </ContactButton>
         ))}
       </div>

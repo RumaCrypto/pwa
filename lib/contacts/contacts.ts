@@ -10,9 +10,9 @@ export type PayoutMethod =
 export interface Contact {
   id: string;
   name: string;
-  /** Shown on the home row; falls back to the first name. */
+  /** Shown on the home row, and what the avatar initials derive from. */
   shortName?: string;
-  /** Overrides the initials derived from the name — "Juan Carlos Vera" shows JC. */
+  /** Only for names whose initials can't be derived, such as a single emoji handle. */
   initials?: string;
   country: string;
   currency: CurrencyCode;
@@ -51,7 +51,6 @@ const CONTACTS: Contact[] = [
     id: "juan-carlos",
     name: "Juan Carlos Vera",
     shortName: "J. Carlos",
-    initials: "JC",
     country: "EC",
     currency: "USD",
     payout: { kind: "ruma", username: "jcvera" },
