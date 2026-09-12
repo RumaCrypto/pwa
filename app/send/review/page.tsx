@@ -19,6 +19,7 @@ import { countryName, displayName } from "@/lib/contacts/contacts";
 import { useSend } from "@/lib/send/send-context";
 import { useMoney } from "@/lib/money/money-context";
 import { isExpired } from "@/lib/send/quote";
+import { useLimits } from "@/lib/limits/limits-context";
 
 export default function SendReviewStep() {
   const router = useRouter();
@@ -26,6 +27,7 @@ export default function SendReviewStep() {
   const { findContact, loaded } = useContacts();
   const { contactId, quote, placeOrder, reset } = useSend();
   const { format } = useMoney();
+  const { recordCompletedSend } = useLimits();
 
   const contact = contactId ? findContact(contactId) : undefined;
   const [expired, setExpired] = useState(false);
@@ -54,6 +56,7 @@ export default function SendReviewStep() {
   const handleSend = () => {
     setSubmitting(true);
     const order = placeOrder(quote, contact.id);
+    recordCompletedSend();
     reset();
     router.replace(`/send/${order.id}`);
   };

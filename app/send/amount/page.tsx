@@ -22,7 +22,7 @@ import { useMoney } from "@/lib/money/money-context";
 import { appendDecimal, appendDigit, backspace, formatDraft, toMoney } from "@/lib/money/amount-input";
 import { convert } from "@/lib/money/money";
 import { buildQuote } from "@/lib/send/quote";
-import { currentLimits } from "@/lib/limits/limits";
+import { useLimits } from "@/lib/limits/limits-context";
 
 const QUICK = [20, 50, 100];
 
@@ -36,6 +36,7 @@ export default function SendAmountStep() {
   const contact = contactId ? findContact(contactId) : undefined;
   const target = contact ? currencyOf(contact) : "USD";
   const { rate, loading, error } = useRate("USD", target);
+  const { limits } = useLimits();
 
   useEffect(() => {
     // Waiting for `loaded` matters most right after creating a contact, when the
@@ -47,7 +48,6 @@ export default function SendAmountStep() {
 
   const send = toMoney(draft, "USD");
   const receive = rate !== null ? convert(send, rate, target) : null;
-  const limits = currentLimits();
   const overLimit = send.amount > limits.perSend.amount;
   const ready = send.amount > 0n && rate !== null && !overLimit;
 

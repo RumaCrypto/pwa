@@ -39,7 +39,7 @@ export function ListRow({
     >
       {leading}
       <span className="min-w-0 flex-1">
-        <span style={typography.body1} className="block truncate">
+        <span style={typography.body1} className="line-clamp-2 block">
           {title}
         </span>
         {subtitle && (

@@ -25,7 +25,8 @@ import { useContacts } from "@/lib/contacts/contacts-context";
 import { displayName } from "@/lib/contacts/contacts";
 import { AddContactSheet } from "@/components/contacts/add-contact-sheet";
 import { useActivity, type ActivityEntry } from "@/lib/activity/activity";
-import { currentLimits } from "@/lib/limits/limits";
+import { useLimits } from "@/lib/limits/limits-context";
+import { MAX_LEVEL } from "@/lib/limits/limits";
 import { formatDayAndTime } from "@/lib/datetime";
 import { truncateAddress } from "@/lib/format";
 
@@ -42,7 +43,7 @@ export default function HomePage() {
 
   const { entries } = useActivity(address);
   const { contacts } = useContacts();
-  const limits = currentLimits();
+  const { limits } = useLimits();
   const [addingContact, setAddingContact] = useState(false);
 
   useEffect(() => {
@@ -127,17 +128,19 @@ export default function HomePage() {
 
       <AddContactSheet open={addingContact} onClose={() => setAddingContact(false)} />
 
-      <Card className="mt-6 flex items-center gap-3 px-4 py-4">
-        <div className="min-w-0 flex-1">
-          <p style={typography.heading4}>
-            {t("home.limit.title", { amount: format(limits.perSend) })}
-          </p>
-          <p style={typography.body4} className="mt-0.5 text-text-secondary">
-            {t("home.limit.subtitle", { level: limits.level, total: limits.maxLevel })}
-          </p>
-        </div>
-        <Badge variant="dark">{t("home.limit.action")}</Badge>
-      </Card>
+      <button onClick={() => router.push("/limits")} className="mt-6 block w-full text-left">
+        <Card className="flex items-center gap-3 px-4 py-4">
+          <div className="min-w-0 flex-1">
+            <p style={typography.heading4}>
+              {t("home.limit.title", { amount: format(limits.perSend) })}
+            </p>
+            <p style={typography.body4} className="mt-0.5 text-text-secondary">
+              {t("home.limit.subtitle", { level: limits.level, total: MAX_LEVEL })}
+            </p>
+          </div>
+          <Badge variant="dark">{t("home.limit.action")}</Badge>
+        </Card>
+      </button>
 
       <SectionTitle className="mt-8">{t("home.activity.title")}</SectionTitle>
       {entries && entries.length > 0 ? (
