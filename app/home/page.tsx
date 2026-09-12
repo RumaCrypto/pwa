@@ -112,8 +112,12 @@ export default function HomePage() {
       </Carousel>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <Button variant="secondary">{t("home.addMoney")}</Button>
-        <Button variant="secondary">{t("home.withdrawMoney")}</Button>
+        <Button variant="secondary" onClick={() => router.push("/add-money")}>
+          {t("home.addMoney")}
+        </Button>
+        <Button variant="secondary" onClick={() => router.push("/withdraw")}>
+          {t("home.withdrawMoney")}
+        </Button>
       </div>
 
       <SectionTitle className="mt-8">{t("home.sendTo")}</SectionTitle>
