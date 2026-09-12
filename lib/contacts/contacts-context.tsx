@@ -7,6 +7,8 @@ const CONTACTS_KEY = "ruma-contacts";
 
 interface ContactsContextType {
   contacts: Contact[];
+  /** False until localStorage has been read, so screens don't act on an empty list. */
+  loaded: boolean;
   addContact: (contact: Omit<Contact, "id">) => Contact;
   removeContact: (id: string) => void;
   findContact: (id: string) => Contact | undefined;
@@ -57,8 +59,8 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ contacts, addContact, removeContact, findContact }),
-    [contacts, addContact, removeContact, findContact]
+    () => ({ contacts, loaded, addContact, removeContact, findContact }),
+    [contacts, loaded, addContact, removeContact, findContact]
   );
 
   return <ContactsContext.Provider value={value}>{children}</ContactsContext.Provider>;

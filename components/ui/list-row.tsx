@@ -43,7 +43,8 @@ export function ListRow({
           {title}
         </span>
         {subtitle && (
-          <span style={typography.body4} className="mt-0.5 block truncate text-text-secondary">
+          // Wraps to a second line, as the designs do, before it ellipsizes.
+          <span style={typography.body4} className="mt-0.5 line-clamp-2 block text-text-secondary">
             {subtitle}
           </span>
         )}

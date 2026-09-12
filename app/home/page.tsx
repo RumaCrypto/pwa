@@ -55,7 +55,13 @@ export default function HomePage() {
   const pending = balanceLoading || rateLoading;
 
   return (
-    <Screen footer={<Button variant="black">{t("home.sendMoney")}</Button>}>
+    <Screen
+      footer={
+        <Button variant="black" onClick={() => router.push("/send")}>
+          {t("home.sendMoney")}
+        </Button>
+      }
+    >
       <header className="flex items-center justify-between gap-3">
         <Badge className="gap-2 py-1.5 pl-1.5 pr-3">
           <span className="h-5 w-5 rounded-full bg-primary" />
