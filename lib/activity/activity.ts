@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fromNumber, type Money } from "@/lib/money/money";
+import { alchemyActivityProvider } from "./alchemy";
 
 export type ActivityKind = "sent" | "received" | "paid";
 export type ActivityStatus = "delivered" | "pending" | "failed";
@@ -21,12 +22,7 @@ export interface ActivityProvider {
   list(address: string): Promise<ActivityEntry[]>;
 }
 
-/**
- * Placeholder until an indexer is wired up. CoinGecko cannot serve this — it
- * publishes token prices, not per-wallet transaction history — so the real
- * implementation will read from an indexer such as the sibling `ruma/indexer`,
- * Basescan, or Alchemy. Only this object is replaced.
- */
+/** Used only when no Alchemy key is configured, so the screen still has shape. */
 export const mockActivityProvider: ActivityProvider = {
   async list() {
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -61,17 +57,35 @@ export const mockActivityProvider: ActivityProvider = {
   },
 };
 
-export function useActivity(address: string | undefined, provider: ActivityProvider = mockActivityProvider) {
+/** Alchemy needs a key; without one the mock keeps the screen usable in development. */
+export const defaultActivityProvider: ActivityProvider = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
+  ? alchemyActivityProvider
+  : mockActivityProvider;
+
+export function useActivity(
+  address: string | undefined,
+  provider: ActivityProvider = defaultActivityProvider
+) {
   const [entries, setEntries] = useState<ActivityEntry[] | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!address) return;
     let active = true;
-    provider.list(address).then((result) => active && setEntries(result));
+
+    provider.list(address).then(
+      (result) => active && setEntries(result),
+      (failure: Error) => {
+        if (!active) return;
+        setError(failure);
+        setEntries([]);
+      }
+    );
+
     return () => {
       active = false;
     };
   }, [address, provider]);
 
-  return { entries, loading: entries === null };
+  return { entries, error, loading: entries === null };
 }

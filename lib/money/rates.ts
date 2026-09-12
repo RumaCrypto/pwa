@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CURRENCY_CODES, type CurrencyCode } from "./currencies";
+import { coingeckoRateProvider } from "./coingecko";
 
 export interface RateProvider {
   getRate(from: CurrencyCode, to: CurrencyCode): Promise<number>;
@@ -28,10 +29,17 @@ export const mockRateProvider: RateProvider = {
 
 export type RateState = { rate: number | null; loading: boolean; error: Error | null };
 
+/**
+ * CoinGecko's public tier needs no key, so it is the default. When it fails the
+ * error surfaces through `useRate` and callers keep showing the USD amount —
+ * better than quietly substituting a stale hardcoded rate.
+ */
+export const defaultRateProvider: RateProvider = coingeckoRateProvider;
+
 export function useRate(
   from: CurrencyCode,
   to: CurrencyCode,
-  provider: RateProvider = mockRateProvider
+  provider: RateProvider = defaultRateProvider
 ): RateState {
   const [state, setState] = useState<RateState>({ rate: null, loading: true, error: null });
 

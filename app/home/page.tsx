@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { ArrowDownLeft, ArrowUpRight, Plus, Settings, Store } from "lucide-react";
@@ -21,10 +21,13 @@ import { useI18n } from "@/lib/i18n/i18n-context";
 import { useUsdcBalance } from "@/hooks/use-usdc-balance";
 import { useConverted, useMoney } from "@/lib/money/money-context";
 import { fromDecimalString, fromMinor } from "@/lib/money/money";
-import { listContacts, type Contact } from "@/lib/contacts/contacts";
+import { useContacts } from "@/lib/contacts/contacts-context";
+import { displayName } from "@/lib/contacts/contacts";
+import { AddContactSheet } from "@/components/contacts/add-contact-sheet";
 import { useActivity, type ActivityEntry } from "@/lib/activity/activity";
 import { currentLimits } from "@/lib/limits/limits";
 import { formatDayAndTime } from "@/lib/datetime";
+import { truncateAddress } from "@/lib/format";
 
 export default function HomePage() {
   const router = useRouter();
@@ -38,8 +41,9 @@ export default function HomePage() {
   const { money: localBalance, loading: rateLoading } = useConverted(usdBalance);
 
   const { entries } = useActivity(address);
-  const contacts = listContacts();
+  const { contacts } = useContacts();
   const limits = currentLimits();
+  const [addingContact, setAddingContact] = useState(false);
 
   useEffect(() => {
     if (ready && !authenticated) router.replace("/onboarding");
@@ -100,18 +104,20 @@ export default function HomePage() {
 
       <SectionTitle className="mt-8">{t("home.sendTo")}</SectionTitle>
       <div className="-mx-6 flex gap-4 overflow-x-auto px-6 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <ContactButton label={t("home.sendTo.new")}>
+        <ContactButton label={t("home.sendTo.new")} onClick={() => setAddingContact(true)}>
           <span className="flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-border-light text-text-secondary">
             <Plus size={18} />
           </span>
         </ContactButton>
         {contacts.map((contact) => (
-          <ContactButton key={contact.id} label={shortNameOf(contact)}>
+          <ContactButton key={contact.id} label={displayName(contact)}>
             {/* Initials come from the short name, so "Rosa Cedeño" is R, not RC. */}
-            <Avatar name={shortNameOf(contact)} initials={contact.initials} />
+            <Avatar name={displayName(contact)} />
           </ContactButton>
         ))}
       </div>
+
+      <AddContactSheet open={addingContact} onClose={() => setAddingContact(false)} />
 
       <Card className="mt-6 flex items-center gap-3 px-4 py-4">
         <div className="min-w-0 flex-1">
@@ -141,10 +147,6 @@ export default function HomePage() {
   );
 }
 
-function shortNameOf(contact: Contact): string {
-  return contact.shortName ?? contact.name.split(" ")[0];
-}
-
 function SectionTitle({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <h2 style={typography.heading3} className={clsx("mb-3", className)}>
@@ -153,9 +155,17 @@ function SectionTitle({ children, className }: { children: React.ReactNode; clas
   );
 }
 
-function ContactButton({ label, children }: { label: string; children: React.ReactNode }) {
+function ContactButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick?: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <button className="flex w-16 shrink-0 flex-col items-center gap-1.5 active:opacity-70">
+    <button onClick={onClick} className="flex w-16 shrink-0 flex-col items-center gap-1.5 active:opacity-70">
       {children}
       <span style={typography.body5} className="w-full truncate text-center text-text-tertiary">
         {label}
@@ -170,9 +180,21 @@ const ACTIVITY_ICONS = {
   paid: Store,
 } as const;
 
+/** Alchemy reports a raw address; show the contact's name when we know them. */
+function counterpartyLabel(entry: ActivityEntry, contacts: ReturnType<typeof useContacts>["contacts"]) {
+  if (!entry.counterparty.startsWith("0x")) return entry.counterparty;
+  const known = contacts.find(
+    (contact) =>
+      contact.payout.kind === "ruma" &&
+      contact.payout.reference.toLowerCase() === entry.counterparty.toLowerCase()
+  );
+  return known ? displayName(known) : truncateAddress(entry.counterparty);
+}
+
 function ActivityRow({ entry }: { entry: ActivityEntry }) {
   const { t, language } = useI18n();
   const { format } = useMoney();
+  const { contacts } = useContacts();
   const Icon = ACTIVITY_ICONS[entry.kind];
   const outgoing = entry.amount.amount < 0n;
 
@@ -183,7 +205,7 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
           <Icon size={16} />
         </span>
       }
-      title={t(`home.activity.${entry.kind}`, { name: entry.counterparty })}
+      title={t(`home.activity.${entry.kind}`, { name: counterpartyLabel(entry, contacts) })}
       subtitle={`${t(`home.activity.status.${entry.status}`)} · ${formatDayAndTime(entry.occurredAt, language)}`}
       trailing={
         <span

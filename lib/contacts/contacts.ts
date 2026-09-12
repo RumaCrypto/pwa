@@ -1,66 +1,43 @@
-import type { CurrencyCode } from "@/lib/money/currencies";
+import { CURRENCIES, CURRENCY_CODES, currencyForCountry, type CurrencyCode } from "@/lib/money/currencies";
+import { LOCALES, type Language } from "@/lib/i18n/languages";
 
-/** How a contact receives money in their country. */
-export type PayoutMethod =
-  | { kind: "pix"; key: string }
-  | { kind: "nequi"; phone: string }
-  | { kind: "cash"; point: string }
-  | { kind: "ruma"; username: string };
+export type PayoutKind = "ruma" | "cash" | "pix" | "nequi";
+
+/** How a contact receives money. `reference` is the Pix key, phone, or username. */
+export interface Payout {
+  kind: PayoutKind;
+  reference: string;
+}
 
 export interface Contact {
   id: string;
   name: string;
-  /** Shown on the home row, and what the avatar initials derive from. */
+  /** What the home strip shows, and what the avatar initials derive from. */
   shortName?: string;
-  /** Only for names whose initials can't be derived, such as a single emoji handle. */
-  initials?: string;
   country: string;
-  currency: CurrencyCode;
-  payout: PayoutMethod;
+  payout: Payout;
 }
 
-/**
- * Contacts live in memory for now. When a backend exists, only this module
- * changes — callers already go through `listContacts`.
- */
-const CONTACTS: Contact[] = [
-  {
-    id: "rosa",
-    name: "Rosa Cedeño",
-    shortName: "Rosa",
-    country: "BR",
-    currency: "BRL",
-    payout: { kind: "pix", key: "4417" },
-  },
-  {
-    id: "diego",
-    name: "Diego Cedeño",
-    shortName: "Diego",
-    country: "CO",
-    currency: "COP",
-    payout: { kind: "cash", point: "Punto Ruma" },
-  },
-  {
-    id: "mama",
-    name: "Mamá",
-    country: "CO",
-    currency: "COP",
-    payout: { kind: "nequi", phone: "8820" },
-  },
-  {
-    id: "juan-carlos",
-    name: "Juan Carlos Vera",
-    shortName: "J. Carlos",
-    country: "EC",
-    currency: "USD",
-    payout: { kind: "ruma", username: "jcvera" },
-  },
-];
+export const COUNTRIES: string[] = CURRENCY_CODES.flatMap(
+  (code) => CURRENCIES[code].countries as readonly string[]
+);
 
-export function listContacts(): Contact[] {
-  return CONTACTS;
+/** Pix exists only in Brazil and Nequi only in Colombia; the rest are universal. */
+export function payoutKindsFor(country: string): PayoutKind[] {
+  const universal: PayoutKind[] = ["ruma", "cash"];
+  if (country === "BR") return ["pix", ...universal];
+  if (country === "CO") return ["nequi", ...universal];
+  return universal;
 }
 
-export function findContact(id: string): Contact | undefined {
-  return CONTACTS.find((contact) => contact.id === id);
+export function currencyOf(contact: Contact): CurrencyCode {
+  return currencyForCountry(contact.country) ?? "USD";
+}
+
+export function displayName(contact: Contact): string {
+  return contact.shortName?.trim() || contact.name.split(" ")[0];
+}
+
+export function countryName(country: string, language: Language): string {
+  return new Intl.DisplayNames(LOCALES[language], { type: "region" }).of(country) ?? country;
 }
