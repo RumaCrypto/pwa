@@ -3,29 +3,43 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
-import { Settings } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Plus, Settings, Store } from "lucide-react";
 import clsx from "clsx";
+
 import { Button } from "@/components/ui/button";
 import { Screen } from "@/components/ui/screen";
 import { StatusCard } from "@/components/ui/status-card";
+import { PaymentCard } from "@/components/ui/payment-card";
+import { Carousel } from "@/components/ui/carousel";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/ui/avatar";
+import { ListRow } from "@/components/ui/list-row";
 import { typography } from "@/constants/typography";
+
 import { useI18n } from "@/lib/i18n/i18n-context";
-import { truncateAddress } from "@/lib/format";
 import { useUsdcBalance } from "@/hooks/use-usdc-balance";
 import { useConverted, useMoney } from "@/lib/money/money-context";
 import { fromDecimalString, fromMinor } from "@/lib/money/money";
+import { listContacts, type Contact } from "@/lib/contacts/contacts";
+import { useActivity, type ActivityEntry } from "@/lib/activity/activity";
+import { currentLimits } from "@/lib/limits/limits";
+import { formatDayAndTime } from "@/lib/datetime";
 
 export default function HomePage() {
   const router = useRouter();
   const { t } = useI18n();
   const { ready, authenticated, user } = usePrivy();
   const address = user?.wallet?.address;
-  const { balance, loading: balanceLoading } = useUsdcBalance(address);
-  const { displayCurrency, format, formatParts } = useMoney();
 
+  const { balance, loading: balanceLoading } = useUsdcBalance(address);
+  const { format, formatParts } = useMoney();
   const usdBalance = balance ? fromDecimalString(balance, "USD") : fromMinor(0n, "USD");
   const { money: localBalance, loading: rateLoading } = useConverted(usdBalance);
+
+  const { entries } = useActivity(address);
+  const contacts = listContacts();
+  const limits = currentLimits();
 
   useEffect(() => {
     if (ready && !authenticated) router.replace("/onboarding");
@@ -37,45 +51,150 @@ export default function HomePage() {
   const pending = balanceLoading || rateLoading;
 
   return (
-    <Screen>
-      <div className="flex items-center justify-between gap-3">
+    <Screen footer={<Button variant="black">{t("home.sendMoney")}</Button>}>
+      <header className="flex items-center justify-between gap-3">
         <Badge className="gap-2 py-1.5 pl-1.5 pr-3">
           <span className="h-5 w-5 rounded-full bg-primary" />
-          <span className="font-mono">{address ? truncateAddress(address) : "—"}</span>
+          <span>{user?.email?.address?.split("@")[0] ?? t("tabs.home.greeting")}</span>
         </Badge>
 
         <div className="flex items-center gap-2">
+          <Badge variant="dark">{t("home.scanQr")}</Badge>
           <Badge variant="outline">{t("tabs.help")}</Badge>
           <button
             onClick={() => router.push("/settings")}
             aria-label={t("settings")}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-white text-text-secondary active:opacity-70"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border-light bg-white text-text-secondary active:opacity-70"
           >
             <Settings size={16} />
           </button>
         </div>
+      </header>
+
+      <Carousel className="mt-6">
+        {[
+          <StatusCard
+            key="balance"
+            label={t("home.balance.label")}
+            caption={t("home.balance.footer")}
+            className="min-h-44"
+          >
+            <p style={typography.display1} className={clsx(pending && "opacity-60")}>
+              <small className="text-2xl opacity-60">{symbol}</small>
+              {integer}
+              <small className="text-2xl opacity-60">
+                {decimal}
+                {fraction}
+              </small>
+            </p>
+            <p style={typography.extralight1} className="mt-1 font-extralight text-text-lightblue">
+              {t("home.balance.caption")}
+            </p>
+          </StatusCard>,
+          <PaymentCard key="card" last4="4417" kind={t("home.card.debit")} className="min-h-44" />,
+        ]}
+      </Carousel>
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <Button variant="secondary">{t("home.addMoney")}</Button>
+        <Button variant="secondary">{t("home.withdrawMoney")}</Button>
       </div>
 
-      <div className="flex flex-1 flex-col justify-center gap-8">
-        <StatusCard
-          label={t("tabs.home.balance")}
-          caption={displayCurrency === "USD" ? "USDC" : `USDC · ${format(usdBalance)}`}
-        >
-          <p style={typography.display1} className={clsx(pending && "opacity-60")}>
-            <small className="text-2xl opacity-60">{symbol}</small>
-            {integer}
-            <small className="text-2xl opacity-60">
-              {decimal}
-              {fraction}
-            </small>
+      <SectionTitle className="mt-8">{t("home.sendTo")}</SectionTitle>
+      <div className="-mx-6 flex gap-4 overflow-x-auto px-6 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ContactButton label={t("home.sendTo.new")}>
+          <span className="flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-border-light text-text-secondary">
+            <Plus size={18} />
+          </span>
+        </ContactButton>
+        {contacts.map((contact) => (
+          <ContactButton key={contact.id} label={shortNameOf(contact)}>
+            <Avatar name={contact.name} initials={contact.initials} />
+          </ContactButton>
+        ))}
+      </div>
+
+      <Card className="mt-6 flex items-center gap-3 px-4 py-4">
+        <div className="min-w-0 flex-1">
+          <p style={typography.heading4}>
+            {t("home.limit.title", { amount: format(limits.perSend) })}
           </p>
-        </StatusCard>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Button variant="black">{t("menu.deposit.label")}</Button>
-          <Button variant="secondary">{t("menu.withdraw.label")}</Button>
+          <p style={typography.body4} className="mt-0.5 text-text-secondary">
+            {t("home.limit.subtitle", { level: limits.level, total: limits.maxLevel })}
+          </p>
         </div>
-      </div>
+        <Badge variant="dark">{t("home.limit.action")}</Badge>
+      </Card>
+
+      <SectionTitle className="mt-8">{t("home.activity.title")}</SectionTitle>
+      {entries && entries.length > 0 ? (
+        <Card divided>
+          {entries.map((entry) => (
+            <ActivityRow key={entry.id} entry={entry} />
+          ))}
+        </Card>
+      ) : (
+        <p style={typography.body3} className="text-text-secondary">
+          {entries ? t("home.activity.empty") : t("common.loading")}
+        </p>
+      )}
     </Screen>
+  );
+}
+
+function shortNameOf(contact: Contact): string {
+  return contact.shortName ?? contact.name.split(" ")[0];
+}
+
+function SectionTitle({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <h2 style={typography.heading3} className={clsx("mb-3", className)}>
+      {children}
+    </h2>
+  );
+}
+
+function ContactButton({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <button className="flex w-16 shrink-0 flex-col items-center gap-1.5 active:opacity-70">
+      {children}
+      <span style={typography.body5} className="w-full truncate text-center text-text-tertiary">
+        {label}
+      </span>
+    </button>
+  );
+}
+
+const ACTIVITY_ICONS = {
+  sent: ArrowUpRight,
+  received: ArrowDownLeft,
+  paid: Store,
+} as const;
+
+function ActivityRow({ entry }: { entry: ActivityEntry }) {
+  const { t, language } = useI18n();
+  const { format } = useMoney();
+  const Icon = ACTIVITY_ICONS[entry.kind];
+  const outgoing = entry.amount.amount < 0n;
+
+  return (
+    <ListRow
+      leading={
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-light text-primary-dark">
+          <Icon size={16} />
+        </span>
+      }
+      title={t(`home.activity.${entry.kind}`, { name: entry.counterparty })}
+      subtitle={`${t(`home.activity.status.${entry.status}`)} · ${formatDayAndTime(entry.occurredAt, language)}`}
+      trailing={
+        <span
+          style={{ ...typography.label2, fontWeight: 700 }}
+          className={clsx("shrink-0", outgoing ? "text-text" : "text-success")}
+        >
+          {outgoing ? "" : "+"}
+          {format(entry.amount)}
+        </span>
+      }
+    />
   );
 }
