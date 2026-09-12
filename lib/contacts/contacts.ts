@@ -1,5 +1,6 @@
 import { CURRENCIES, CURRENCY_CODES, currencyForCountry, type CurrencyCode } from "@/lib/money/currencies";
 import { LOCALES, type Language } from "@/lib/i18n/languages";
+import { FLAGS, type Flags } from "@/lib/flags";
 
 export type PayoutKind = "ruma" | "cash" | "pix" | "nequi";
 
@@ -23,8 +24,9 @@ export const COUNTRIES: string[] = CURRENCY_CODES.flatMap(
 );
 
 /** Pix exists only in Brazil and Nequi only in Colombia; the rest are universal. */
-export function payoutKindsFor(country: string): PayoutKind[] {
-  const universal: PayoutKind[] = ["ruma", "cash"];
+export function payoutKindsFor(country: string, flags: Flags = FLAGS): PayoutKind[] {
+  // Cash payout depends on Ruma points, which do not exist yet.
+  const universal: PayoutKind[] = flags.cashPoints ? ["ruma", "cash"] : ["ruma"];
   if (country === "BR") return ["pix", ...universal];
   if (country === "CO") return ["nequi", ...universal];
   return universal;

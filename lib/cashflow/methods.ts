@@ -1,4 +1,5 @@
 import { add, fromNumber, type Money } from "@/lib/money/money";
+import { FLAGS, type Flags } from "@/lib/flags";
 
 export const ADD_METHODS = ["bank", "cash", "wallet"] as const;
 export const OUT_METHODS = ["bank", "cash", "wallet"] as const;
@@ -22,8 +23,19 @@ export function isAvailable(method: CashflowMethod): boolean {
   return method === "wallet";
 }
 
-export function defaultMethod(methods: readonly CashflowMethod[]): CashflowMethod {
-  return methods[0];
+/** Drops routes whose flag is off, so nothing unreachable is ever offered. */
+export function enabledMethods(
+  methods: readonly CashflowMethod[],
+  flags: Flags = FLAGS
+): CashflowMethod[] {
+  return methods.filter((method) => method !== "cash" || flags.cashPoints);
+}
+
+export function defaultMethod(
+  methods: readonly CashflowMethod[],
+  flags: Flags = FLAGS
+): CashflowMethod {
+  return enabledMethods(methods, flags)[0];
 }
 
 export function withdrawTotal(amount: Money): Money {

@@ -4,6 +4,7 @@ import {
   OUT_METHODS,
   WITHDRAW_FEE,
   defaultMethod,
+  enabledMethods,
   isAdvanced,
   isAvailable,
   withdrawTotal,
@@ -21,8 +22,31 @@ describe("method catalogues", () => {
   });
 
   it("preselects the bank, as the designs do", () => {
-    expect(defaultMethod(ADD_METHODS)).toBe("bank");
-    expect(defaultMethod(OUT_METHODS)).toBe("bank");
+    expect(defaultMethod(ADD_METHODS, on)).toBe("bank");
+    expect(defaultMethod(OUT_METHODS, off)).toBe("bank");
+  });
+});
+
+const on = { cashPoints: true };
+const off = { cashPoints: false };
+
+describe("enabledMethods", () => {
+  it("hides cash while no Ruma points exist", () => {
+    expect(enabledMethods(ADD_METHODS, off)).toEqual(["bank", "wallet"]);
+    expect(enabledMethods(OUT_METHODS, off)).toEqual(["bank", "wallet"]);
+  });
+
+  it("shows cash once the flag is on", () => {
+    expect(enabledMethods(ADD_METHODS, on)).toEqual(["bank", "cash", "wallet"]);
+  });
+
+  it("never preselects a hidden route", () => {
+    expect(enabledMethods(ADD_METHODS, off)).toContain(defaultMethod(ADD_METHODS, off));
+  });
+
+  it("leaves the catalogue itself untouched", () => {
+    enabledMethods(ADD_METHODS, off);
+    expect(ADD_METHODS).toEqual(["bank", "cash", "wallet"]);
   });
 });
 

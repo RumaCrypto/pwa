@@ -9,12 +9,13 @@ import { RadioCard } from "@/components/ui/radio-card";
 import { typography } from "@/constants/typography";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
-import { ADD_METHODS, defaultMethod, isAdvanced, type CashflowMethod } from "@/lib/cashflow/methods";
+import { ADD_METHODS, defaultMethod, enabledMethods, isAdvanced, type CashflowMethod } from "@/lib/cashflow/methods";
 
 export default function AddMoneyScreen() {
   const router = useRouter();
   const { t } = useI18n();
   const [method, setMethod] = useState<CashflowMethod>(defaultMethod(ADD_METHODS));
+  const methods = enabledMethods(ADD_METHODS);
 
   return (
     <Screen
@@ -31,7 +32,7 @@ export default function AddMoneyScreen() {
       </h2>
 
       <div role="radiogroup" className="flex flex-col gap-3">
-        {ADD_METHODS.map((option) => (
+        {methods.map((option) => (
           <RadioCard
             key={option}
             title={t(`cashflow.add.${option}` as "cashflow.add.bank")}

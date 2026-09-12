@@ -18,6 +18,7 @@ import {
   OUT_METHODS,
   WITHDRAW_FEE,
   defaultMethod,
+  enabledMethods,
   isAdvanced,
   type CashflowMethod,
 } from "@/lib/cashflow/methods";
@@ -27,6 +28,7 @@ export default function WithdrawScreen() {
   const { t } = useI18n();
   const { format } = useMoney();
   const [method, setMethod] = useState<CashflowMethod>(defaultMethod(OUT_METHODS));
+  const methods = enabledMethods(OUT_METHODS);
 
   const { user } = usePrivy();
   const { balance } = useUsdcBalance(user?.wallet?.address);
@@ -48,7 +50,7 @@ export default function WithdrawScreen() {
       </h2>
 
       <div role="radiogroup" className="flex flex-col gap-3">
-        {OUT_METHODS.map((option) => (
+        {methods.map((option) => (
           <RadioCard
             key={option}
             title={t(`cashflow.out.${option}` as "cashflow.out.bank")}
