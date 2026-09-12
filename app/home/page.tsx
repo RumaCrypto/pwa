@@ -102,7 +102,9 @@ export default function HomePage() {
               </small>
             </p>
           </StatusCard>,
-          <PaymentCard key="card" last4="4417" kind={t("home.card.debit")} className="min-h-44" />,
+          <button key="card" onClick={() => router.push("/card")} className="block w-full text-left">
+            <PaymentCard last4="4417" kind={t("home.card.debit")} className="min-h-44" />
+          </button>,
         ]}
       </Carousel>
 

@@ -40,7 +40,7 @@ export function PaymentCard({ last4, holder, kind, expiry, className }: PaymentC
 
       <div className="mt-6 flex items-end justify-between">
         <span style={typography.heading3} className="font-mono tracking-widest">
-          ···· {last4}
+          ···· ···· ···· {last4}
         </span>
         <span style={typography.heading3} className="italic">
           VISA
