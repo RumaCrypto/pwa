@@ -3,12 +3,15 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
+import { Settings } from "lucide-react";
 import clsx from "clsx";
 import { Button } from "@/components/ui/button";
 import { typography } from "@/constants/typography";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { truncateAddress } from "@/lib/format";
 import { useUsdcBalance } from "@/hooks/use-usdc-balance";
+import { useConverted, useMoney } from "@/lib/money/money-context";
+import { fromDecimalString, fromMinor } from "@/lib/money/money";
 
 export default function HomePage() {
   const router = useRouter();
@@ -16,6 +19,10 @@ export default function HomePage() {
   const { ready, authenticated, user } = usePrivy();
   const address = user?.wallet?.address;
   const { balance, loading: balanceLoading } = useUsdcBalance(address);
+  const { displayCurrency, format, formatParts } = useMoney();
+
+  const usdBalance = balance ? fromDecimalString(balance, "USD") : fromMinor(0n, "USD");
+  const { money: localBalance, loading: rateLoading } = useConverted(usdBalance);
 
   useEffect(() => {
     if (ready && !authenticated) router.replace("/onboarding");
@@ -23,7 +30,9 @@ export default function HomePage() {
 
   if (!ready || !authenticated) return null;
 
-  const [whole, cents] = (Number(balance ?? 0)).toFixed(2).split(".");
+  const shown = localBalance ?? usdBalance;
+  const { symbol, integer, decimal, fraction } = formatParts(shown);
+  const pending = balanceLoading || rateLoading;
 
   return (
     <div className="flex flex-1 flex-col px-6 pb-8 pt-6">
@@ -34,12 +43,21 @@ export default function HomePage() {
             {address ? truncateAddress(address) : "—"}
           </span>
         </div>
-        <button
-          style={typography.label4}
-          className="rounded-full border border-border-light bg-white px-3 py-1.5 text-text-secondary active:opacity-70"
-        >
-          {t("tabs.help")}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            style={typography.label4}
+            className="rounded-full border border-border-light bg-white px-3 py-1.5 text-text-secondary active:opacity-70"
+          >
+            {t("tabs.help")}
+          </button>
+          <button
+            onClick={() => router.push("/settings")}
+            aria-label={t("settings")}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-white text-text-secondary active:opacity-70"
+          >
+            <Settings size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col justify-center gap-8">
@@ -47,13 +65,19 @@ export default function HomePage() {
           <p style={typography.extralight1} className="text-text-lightblue font-extralight">
             {t("tabs.home.balance")}
           </p>
-          <p className={clsx("mt-1 flex items-end gap-2", balanceLoading && "opacity-60")}>
+          <p className={clsx("mt-1 flex items-end gap-2", pending && "opacity-60")}>
             <span style={typography.display1}>
-              {whole}
-              <small className="text-2xl opacity-60">.{cents}</small>
+              <small className="text-2xl opacity-60">{symbol}</small>
+              {integer}
+              <small className="text-2xl opacity-60">
+                {decimal}
+                {fraction}
+              </small>
             </span>
           </p>
-          <div style={typography.extralight1} className="text-text-lightblue font-extralight mt-3">USDC · equivale a $0,00</div>
+          <div style={typography.extralight1} className="text-text-lightblue font-extralight mt-3">
+            {displayCurrency === "USD" ? "USDC" : `USDC · ${format(usdBalance)}`}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
