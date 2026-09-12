@@ -24,6 +24,11 @@ describe("formatMoney", () => {
     expect(formatMoney(fromNumber(-200, "USD"), "es")).toBe("-$200,00");
   });
 
+  it("keeps a space when the locale falls back to an ISO code", () => {
+    // es-CO has no symbol for soles, so Intl prints "PEN"; "PEN672,32" is unreadable.
+    expect(formatMoney(fromNumber(672.32, "PEN"), "es")).toMatch(/^PEN\s672,32$/);
+  });
+
   it("agrees with formatMoneyParts on the same amount", () => {
     const amount = fromNumber(1080.5, "BRL");
     const { symbol, integer, decimal, fraction } = formatMoneyParts(amount, "es");

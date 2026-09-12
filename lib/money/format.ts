@@ -22,13 +22,23 @@ function formatter(money: Money, language: Language, { symbol = true }: FormatOp
   });
 }
 
+/** An ISO code, shown when the locale has no symbol for the currency (PEN, COP). */
+const IS_ISO_CODE = /^[A-Z]{3}$/;
+
 /**
  * es-CO renders "$ 1.080,50" with a non-breaking space after the symbol, but the
  * designs set the symbol tight against the digits — and `formatMoneyParts`
  * already drops it, so leaving it here made the same amount render two ways.
+ *
+ * The space stays when the locale falls back to an ISO code, since "PEN672,32"
+ * does not read as an amount.
  */
 export function formatMoney(money: Money, language: Language, options?: FormatOptions): string {
   const parts = formatter(money, language, options).formatToParts(toNumber(money));
+  const currency = parts.find((part) => part.type === "currency")?.value ?? "";
+  if (IS_ISO_CODE.test(currency)) {
+    return parts.map((part) => part.value).join("");
+  }
 
   return parts
     .filter((part, index) => {

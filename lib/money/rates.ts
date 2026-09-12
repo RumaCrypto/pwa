@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { CURRENCY_CODES, type CurrencyCode } from "./currencies";
-import { coingeckoRateProvider } from "./coingecko";
+import { coingeckoRateProvider, coingeckoSupports } from "./coingecko";
+import { exchangeRateProvider } from "./exchangerate";
+import { routeByCoverage } from "./compose-rates";
 
 export interface RateProvider {
   getRate(from: CurrencyCode, to: CurrencyCode): Promise<number>;
@@ -30,11 +32,16 @@ export const mockRateProvider: RateProvider = {
 export type RateState = { rate: number | null; loading: boolean; error: Error | null };
 
 /**
- * CoinGecko's public tier needs no key, so it is the default. When it fails the
- * error surfaces through `useRate` and callers keep showing the USD amount —
- * better than quietly substituting a stale hardcoded rate.
+ * CoinGecko quotes USDC directly, so it is preferred; COP and PEN, which it does
+ * not carry, are routed to the fiat feed. Neither needs a key. A failure surfaces
+ * through `useRate` and callers keep showing the USD amount, rather than
+ * substituting a rate that would be quietly wrong.
  */
-export const defaultRateProvider: RateProvider = coingeckoRateProvider;
+export const defaultRateProvider: RateProvider = routeByCoverage(
+  coingeckoRateProvider,
+  exchangeRateProvider,
+  coingeckoSupports
+);
 
 export function useRate(
   from: CurrencyCode,
