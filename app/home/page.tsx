@@ -6,6 +6,9 @@ import { usePrivy } from "@privy-io/react-auth";
 import { Settings } from "lucide-react";
 import clsx from "clsx";
 import { Button } from "@/components/ui/button";
+import { Screen } from "@/components/ui/screen";
+import { StatusCard } from "@/components/ui/status-card";
+import { Badge } from "@/components/ui/badge";
 import { typography } from "@/constants/typography";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { truncateAddress } from "@/lib/format";
@@ -30,26 +33,19 @@ export default function HomePage() {
 
   if (!ready || !authenticated) return null;
 
-  const shown = localBalance ?? usdBalance;
-  const { symbol, integer, decimal, fraction } = formatParts(shown);
+  const { symbol, integer, decimal, fraction } = formatParts(localBalance ?? usdBalance);
   const pending = balanceLoading || rateLoading;
 
   return (
-    <div className="flex flex-1 flex-col px-6 pb-8 pt-6">
+    <Screen>
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 rounded-full bg-primary-light py-1.5 pl-1.5 pr-3">
+        <Badge className="gap-2 py-1.5 pl-1.5 pr-3">
           <span className="h-5 w-5 rounded-full bg-primary" />
-          <span style={typography.label4} className="font-mono text-primary-dark">
-            {address ? truncateAddress(address) : "—"}
-          </span>
-        </div>
+          <span className="font-mono">{address ? truncateAddress(address) : "—"}</span>
+        </Badge>
+
         <div className="flex items-center gap-2">
-          <button
-            style={typography.label4}
-            className="rounded-full border border-border-light bg-white px-3 py-1.5 text-text-secondary active:opacity-70"
-          >
-            {t("tabs.help")}
-          </button>
+          <Badge variant="outline">{t("tabs.help")}</Badge>
           <button
             onClick={() => router.push("/settings")}
             aria-label={t("settings")}
@@ -61,30 +57,25 @@ export default function HomePage() {
       </div>
 
       <div className="flex flex-1 flex-col justify-center gap-8">
-        <div className="rounded-3xl bg-primary-dark px-6 py-6 text-white">
-          <p style={typography.extralight1} className="text-text-lightblue font-extralight">
-            {t("tabs.home.balance")}
+        <StatusCard
+          label={t("tabs.home.balance")}
+          caption={displayCurrency === "USD" ? "USDC" : `USDC · ${format(usdBalance)}`}
+        >
+          <p style={typography.display1} className={clsx(pending && "opacity-60")}>
+            <small className="text-2xl opacity-60">{symbol}</small>
+            {integer}
+            <small className="text-2xl opacity-60">
+              {decimal}
+              {fraction}
+            </small>
           </p>
-          <p className={clsx("mt-1 flex items-end gap-2", pending && "opacity-60")}>
-            <span style={typography.display1}>
-              <small className="text-2xl opacity-60">{symbol}</small>
-              {integer}
-              <small className="text-2xl opacity-60">
-                {decimal}
-                {fraction}
-              </small>
-            </span>
-          </p>
-          <div style={typography.extralight1} className="text-text-lightblue font-extralight mt-3">
-            {displayCurrency === "USD" ? "USDC" : `USDC · ${format(usdBalance)}`}
-          </div>
-        </div>
+        </StatusCard>
 
         <div className="grid grid-cols-2 gap-3">
           <Button variant="black">{t("menu.deposit.label")}</Button>
           <Button variant="secondary">{t("menu.withdraw.label")}</Button>
         </div>
       </div>
-    </div>
+    </Screen>
   );
 }
