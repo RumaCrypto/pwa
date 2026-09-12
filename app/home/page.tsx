@@ -69,7 +69,9 @@ export default function HomePage() {
         </Badge>
 
         <div className="flex items-center gap-2">
-          <Badge variant="dark">{t("home.scanQr")}</Badge>
+          <button onClick={() => router.push("/pay")}>
+            <Badge variant="dark">{t("home.scanQr")}</Badge>
+          </button>
           <Badge variant="outline">{t("tabs.help")}</Badge>
           <button
             onClick={() => router.push("/settings")}
