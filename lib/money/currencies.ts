@@ -5,6 +5,8 @@ export const CURRENCIES = {
   MXN: { code: "MXN", symbol: "$", decimals: 2, countries: ["MX"] },
   ARS: { code: "ARS", symbol: "$", decimals: 2, countries: ["AR"] },
   PEN: { code: "PEN", symbol: "S/", decimals: 2, countries: ["PE"] },
+  VES: { code: "VES", symbol: "Bs.", decimals: 2, countries: ["VE"] },
+  BOB: { code: "BOB", symbol: "Bs.", decimals: 2, countries: ["BO"] },
 } as const;
 
 export type CurrencyCode = keyof typeof CURRENCIES;

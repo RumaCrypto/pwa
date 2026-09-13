@@ -18,6 +18,8 @@ const USD_RATES: Record<CurrencyCode, number> = {
   MXN: 17.2,
   ARS: 1035,
   PEN: 3.75,
+  VES: 190,
+  BOB: 6.9,
 };
 
 export const mockRateProvider: RateProvider = {
