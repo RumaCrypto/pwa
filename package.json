@@ -13,6 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@p2pdotme/sdk": "^1.2.25",
     "@privy-io/react-auth": "^3.38.0",
     "@serwist/next": "latest",
     "clsx": "^2.1.1",
