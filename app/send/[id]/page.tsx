@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { Screen } from "@/components/ui/screen";
@@ -17,19 +17,18 @@ import { useContacts } from "@/lib/contacts/contacts-context";
 import { countryName, displayName } from "@/lib/contacts/contacts";
 import { useSend } from "@/lib/send/send-context";
 import { useMoney } from "@/lib/money/money-context";
-import { formatTime } from "@/lib/datetime";
-import { STAGES, canCancel, estimatedArrival, progressAt, stageAt, stageStateAt, type Order } from "@/lib/send/orders";
+import { useOrderTracking } from "@/lib/send/use-order-tracking";
+import { STAGES, progressFor, stageState, type Order } from "@/lib/send/orders";
 
 export default function SendTrackingScreen() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const { t, language } = useI18n();
   const { findContact } = useContacts();
-  const { getOrder, cancelOrder } = useSend();
+  const { getOrder, updateOrder } = useSend();
   const { format } = useMoney();
 
   const [order, setOrder] = useState<Order | null | undefined>(undefined);
-  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect --
@@ -38,12 +37,18 @@ export default function SendTrackingScreen() {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [id, getOrder]);
 
-  // The stage is derived from elapsed time, so the screen advances by re-reading
-  // the clock rather than by holding timers that a reload would lose.
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const contact = order ? findContact(order.contactId) : undefined;
+
+  const handleOrderUpdate = useCallback(
+    (orderId: string, patch: Partial<Order>) => {
+      const updated = updateOrder(orderId, patch);
+      if (updated) setOrder(updated);
+      return updated;
+    },
+    [updateOrder]
+  );
+
+  useOrderTracking(order, contact, handleOrderUpdate);
 
   if (order === undefined) return null;
 
@@ -57,13 +62,28 @@ export default function SendTrackingScreen() {
     );
   }
 
-  const contact = findContact(order.contactId);
   const name = contact ? displayName(contact) : t("common.to");
-  const stage = stageAt(order.createdAt, now, order.cancelledAt);
-  const cancelled = Boolean(order.cancelledAt);
+  const failed = order.phase === "failed";
 
-  const handleCancel = () => setOrder(cancelOrder(order.id) ?? order);
-  const arrival = estimatedArrival(order.createdAt);
+  const label = failed
+    ? order.failureReason === "cancelled"
+      ? t("sendFlow.track.cancelled")
+      : order.failureReason === "timeout"
+        ? t("sendFlow.track.merchantTimeout")
+        : t("sendFlow.track.orderError")
+    : order.phase === "completed"
+      ? t("sendFlow.track.delivered", { name })
+      : t("sendFlow.track.onItsWay", { name });
+
+  const caption = failed
+    ? order.failureReason === "cancelled"
+      ? t("sendFlow.track.cancelledHint", { name })
+      : order.failureReason === "timeout"
+        ? t("sendFlow.track.merchantTimeoutHint", { id: order.id })
+        : t("sendFlow.track.orderErrorHint", { id: order.id })
+    : order.phase === "completed"
+      ? undefined
+      : t("sendFlow.track.inProgress");
 
   const stageHints: Record<(typeof STAGES)[number], string> = {
     funded: t("sendFlow.stage.fundedHint", { amount: format(order.quote.total) }),
@@ -79,39 +99,16 @@ export default function SendTrackingScreen() {
       title={t("sendFlow.track.title", { id: order.id })}
       backLabel={t("common.back")}
       footer={
-        <>
-          <Button variant="secondary" onClick={() => router.replace("/home")}>
-            {t("sendFlow.track.backHome")}
-          </Button>
-          {canCancel(order, now) && (
-            <button
-              onClick={handleCancel}
-              style={typography.body3}
-              className="mt-3 w-full text-center text-danger active:opacity-70"
-            >
-              {t("sendFlow.track.cancel")}
-            </button>
-          )}
-        </>
+        <Button variant="secondary" onClick={() => router.replace("/home")}>
+          {t("sendFlow.track.backHome")}
+        </Button>
       }
     >
       <StatusCard
-        label={
-          cancelled
-            ? t("sendFlow.track.cancelled")
-            : stage === "delivered"
-              ? t("sendFlow.track.delivered", { name })
-              : t("sendFlow.track.onItsWay", { name })
-        }
-        progress={cancelled ? undefined : progressAt(order.createdAt, now)}
-        caption={
-          cancelled
-            ? t("sendFlow.track.cancelledHint", { name })
-            : stage === "delivered"
-              ? undefined
-              : t("sendFlow.track.arrivesBy", { time: formatTime(arrival, language) })
-        }
-        className={cancelled ? "bg-text-tertiary" : undefined}
+        label={label}
+        progress={failed ? undefined : progressFor(order)}
+        caption={caption}
+        className={failed ? "bg-text-tertiary" : undefined}
       >
         <p style={typography.display4}>
           {format(order.quote.receive, { symbol: false })}
@@ -123,15 +120,9 @@ export default function SendTrackingScreen() {
         <Timeline
           steps={STAGES.map((key) => ({
             title:
-              key === "paying" || key === "delivered"
-                ? t(`sendFlow.stage.${key}`, { name })
-                : t(`sendFlow.stage.${key}`),
+              key === "paying" || key === "delivered" ? t(`sendFlow.stage.${key}`, { name }) : t(`sendFlow.stage.${key}`),
             subtitle: stageHints[key],
-            state: cancelled
-              ? stageStateAt(key, order.createdAt, order.cancelledAt!) === "current"
-                ? "pending"
-                : stageStateAt(key, order.createdAt, order.cancelledAt!)
-              : stageStateAt(key, order.createdAt, now),
+            state: failed && stageState(key, order) === "current" ? "pending" : stageState(key, order),
           }))}
         />
       </div>

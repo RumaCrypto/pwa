@@ -20,6 +20,7 @@ import { useSend } from "@/lib/send/send-context";
 import { useMoney } from "@/lib/money/money-context";
 import { isExpired } from "@/lib/send/quote";
 import { useLimits } from "@/lib/limits/limits-context";
+import { useP2pWalletClient } from "@/hooks/use-p2p-wallet-client";
 
 export default function SendReviewStep() {
   const router = useRouter();
@@ -28,10 +29,12 @@ export default function SendReviewStep() {
   const { contactId, quote, placeOrder, reset } = useSend();
   const { format } = useMoney();
   const { recordCompletedSend } = useLimits();
+  const getWalletClient = useP2pWalletClient();
 
   const contact = contactId ? findContact(contactId) : undefined;
   const [expired, setExpired] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // `submitting` matters because placing the order clears the draft, which
@@ -53,12 +56,19 @@ export default function SendReviewStep() {
 
   const name = displayName(contact);
 
-  const handleSend = () => {
+  const handleSend = async () => {
+    setError(null);
     setSubmitting(true);
-    const order = placeOrder(quote, contact.id);
-    recordCompletedSend();
-    reset();
-    router.replace(`/send/${order.id}`);
+    try {
+      const { walletClient, address } = await getWalletClient();
+      const order = await placeOrder({ quote, contact, walletClient, userAddress: address });
+      recordCompletedSend();
+      reset();
+      router.replace(`/send/${order.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -68,9 +78,14 @@ export default function SendReviewStep() {
       step={{ current: 3, total: 3 }}
       footer={
         <>
-          <Button variant="black" onClick={handleSend} disabled={expired}>
-            {t("sendFlow.step3.send", { amount: format(quote.total) })}
+          <Button variant="black" onClick={handleSend} disabled={expired || submitting}>
+            {submitting ? t("sendFlow.step3.placing") : t("sendFlow.step3.send", { amount: format(quote.total) })}
           </Button>
+          {error && (
+            <p style={typography.body5} className="mt-3 text-center text-danger">
+              {t("sendFlow.step3.orderFailed", { error })}
+            </p>
+          )}
           <p style={typography.body5} className="mt-3 text-center text-text-secondary">
             {t("sendFlow.step3.legal")}
           </p>

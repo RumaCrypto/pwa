@@ -1,103 +1,72 @@
 import { describe, expect, it } from "vitest";
-import { STAGES, canCancel, stageAt, stageIndex, stageStateAt, progressAt, type Order } from "./orders";
+import { STAGES, isTerminal, progressFor, stageFor, stageState, type Order } from "./orders";
 import { buildQuote } from "./quote";
 import { fromNumber } from "@/lib/money/money";
 
 const START = new Date("2026-09-12T12:00:00Z");
-const after = (seconds: number) => new Date(START.getTime() + seconds * 1000);
 
-const order: Order = {
+const base: Order = {
   id: "RM-000001",
   contactId: "rosa",
   quote: buildQuote(fromNumber(200, "USD"), 5.4, "BRL", START),
   createdAt: START,
+  p2pOrderId: 42n,
+  placeTxHash: "0xabc",
+  phase: "awaiting_merchant",
 };
 
-describe("stageAt", () => {
-  it("walks the four stages the tracking screen shows", () => {
-    expect(stageAt(START, START)).toBe("funded");
-    expect(stageAt(START, after(6))).toBe("converted");
-    expect(stageAt(START, after(15))).toBe("paying");
-    expect(stageAt(START, after(60))).toBe("delivered");
+describe("stageFor", () => {
+  it("sits at funded while no merchant has accepted", () => {
+    expect(stageFor(base)).toBe("funded");
   });
 
-  it("never moves backwards", () => {
-    let previous = -1;
-    for (let second = 0; second <= 120; second += 1) {
-      const index = stageIndex(stageAt(START, after(second)));
-      expect(index).toBeGreaterThanOrEqual(previous);
-      previous = index;
-    }
+  it("moves to converted once a merchant is seen, even before payout details are sent", () => {
+    expect(stageFor({ ...base, acceptedMerchant: "0xmerchant" })).toBe("converted");
   });
 
-  it("stays delivered once it arrives", () => {
-    expect(stageAt(START, after(10_000))).toBe("delivered");
+  it("moves to paying once payout details are on their way", () => {
+    expect(stageFor({ ...base, phase: "awaiting_completion", acceptedMerchant: "0xmerchant" })).toBe("paying");
+  });
+
+  it("reaches delivered only once completed", () => {
+    expect(stageFor({ ...base, phase: "completed", acceptedMerchant: "0xmerchant" })).toBe("delivered");
+  });
+
+  it("freezes a failed order at whatever stage it last reached", () => {
+    expect(stageFor({ ...base, phase: "failed", failureReason: "cancelled" })).toBe("funded");
+    expect(
+      stageFor({ ...base, phase: "failed", failureReason: "error", acceptedMerchant: "0xmerchant" })
+    ).toBe("converted");
   });
 });
 
-describe("stageStateAt", () => {
+describe("stageState", () => {
   it("marks earlier stages done, the current one current, the rest pending", () => {
-    const at = after(15); // paying
-    expect(STAGES.map((stage) => stageStateAt(stage, START, at))).toEqual([
-      "done",
-      "done",
-      "current",
-      "pending",
-    ]);
+    const order: Order = { ...base, phase: "awaiting_completion", acceptedMerchant: "0xmerchant" };
+    expect(STAGES.map((stage) => stageState(stage, order))).toEqual(["done", "done", "current", "pending"]);
   });
 
-  it("marks every stage done once delivered", () => {
-    const at = after(60);
-    expect(STAGES.map((stage) => stageStateAt(stage, START, at))).toEqual([
-      "done",
-      "done",
-      "done",
-      "done",
-    ]);
+  it("marks every stage done once completed", () => {
+    const order: Order = { ...base, phase: "completed", acceptedMerchant: "0xmerchant" };
+    expect(STAGES.map((stage) => stageState(stage, order))).toEqual(["done", "done", "done", "done"]);
   });
 });
 
-describe("progressAt", () => {
-  it("runs from a visible sliver to full", () => {
-    expect(progressAt(START, START)).toBeGreaterThan(0);
-    expect(progressAt(START, after(60))).toBe(1);
-  });
-
-  it("increases over time and stays within bounds", () => {
-    const samples = [0, 5, 12, 20, 40, 60].map((s) => progressAt(START, after(s)));
-    for (let i = 1; i < samples.length; i += 1) {
-      expect(samples[i]).toBeGreaterThanOrEqual(samples[i - 1]);
-    }
-    expect(Math.min(...samples)).toBeGreaterThanOrEqual(0);
-    expect(Math.max(...samples)).toBeLessThanOrEqual(1);
+describe("progressFor", () => {
+  it("runs from a visible sliver to full across the real stages", () => {
+    expect(progressFor(base)).toBeCloseTo(0.25, 10);
+    expect(progressFor({ ...base, phase: "completed", acceptedMerchant: "0xmerchant" })).toBe(1);
   });
 });
 
-describe("canCancel", () => {
-  it("allows cancelling while the money is still moving", () => {
-    expect(canCancel(order, START)).toBe(true);
-    expect(canCancel(order, after(15))).toBe(true);
+describe("isTerminal", () => {
+  it("is false while an order is still moving", () => {
+    expect(isTerminal(base)).toBe(false);
+    expect(isTerminal({ ...base, phase: "awaiting_completion" })).toBe(false);
   });
 
-  it("refuses once delivered, since there is nothing left to stop", () => {
-    expect(canCancel(order, after(60))).toBe(false);
-  });
-
-  it("refuses an order already cancelled", () => {
-    expect(canCancel({ ...order, cancelledAt: after(5) }, after(10))).toBe(false);
-  });
-});
-
-describe("a cancelled order", () => {
-  const cancelled: Order = { ...order, cancelledAt: after(10) };
-
-  it("stops advancing at the stage it was cancelled in", () => {
-    expect(stageAt(cancelled.createdAt, after(10), cancelled.cancelledAt)).toBe("converted");
-    // Time keeps passing, but the order does not.
-    expect(stageAt(cancelled.createdAt, after(600), cancelled.cancelledAt)).toBe("converted");
-  });
-
-  it("leaves an uncancelled order unaffected", () => {
-    expect(stageAt(order.createdAt, after(600))).toBe("delivered");
+  it("is true once completed or failed", () => {
+    expect(isTerminal({ ...base, phase: "completed" })).toBe(true);
+    expect(isTerminal({ ...base, phase: "failed", failureReason: "cancelled" })).toBe(true);
   });
 });

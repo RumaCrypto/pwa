@@ -1,4 +1,4 @@
-import { COUNTRY_OPTIONS } from "@p2pdotme/sdk/country";
+import { COUNTRY_OPTIONS, type CurrencyCode as SdkCurrencyCode } from "@p2pdotme/sdk/country";
 
 import { currencyForCountry, type CurrencyCode } from "@/lib/money/currencies";
 import { LOCALES, type Language } from "@/lib/i18n/languages";
@@ -39,6 +39,18 @@ export function payoutKindsFor(country: string, flags: Flags = FLAGS): PayoutKin
 
 export function currencyOf(contact: Contact): CurrencyCode {
   return currencyForCountry(contact.country) ?? "USD";
+}
+
+/**
+ * The p2p.me currency a sell order must quote for this contact's country.
+ * Not the same axis as `currencyOf`: Ecuador displays and settles in USD
+ * locally, but p2p.me still prices its "ECU" corridor at its own sell price
+ * (currently ~0.98, not 1:1) — so this is keyed by country, not currency.
+ */
+export function sdkCurrencyForCountry(country: string): SdkCurrencyCode {
+  const option = COUNTRY_OPTIONS.find((candidate) => candidate.locale.split("-")[1] === country);
+  if (!option) throw new Error(`p2p.me has no currency for country ${country}`);
+  return option.currency;
 }
 
 export function displayName(contact: Contact): string {
