@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CURRENCY_CODES, type CurrencyCode } from "./currencies";
 import { coingeckoRateProvider, coingeckoSupports } from "./coingecko";
 import { exchangeRateProvider } from "./exchangerate";
+import { p2pRateProvider, p2pSupports } from "./p2p-prices";
 import { routeByCoverage } from "./compose-rates";
 
 export interface RateProvider {
@@ -34,15 +35,17 @@ export const mockRateProvider: RateProvider = {
 export type RateState = { rate: number | null; loading: boolean; error: Error | null };
 
 /**
- * CoinGecko quotes USDC directly, so it is preferred; COP and PEN, which it does
- * not carry, are routed to the fiat feed. Neither needs a key. A failure surfaces
- * through `useRate` and callers keep showing the USD amount, rather than
- * substituting a rate that would be quietly wrong.
+ * p2p.me's own sell price is preferred wherever it quotes, since that is the
+ * rate a withdraw actually pays out at. CoinGecko quotes USDC directly for
+ * what's left; COP and PEN would fall here too but p2p.me already covers
+ * them. Neither needs a key. A failure surfaces through `useRate` and callers
+ * keep showing the USD amount, rather than substituting a rate that would be
+ * quietly wrong.
  */
 export const defaultRateProvider: RateProvider = routeByCoverage(
-  coingeckoRateProvider,
-  exchangeRateProvider,
-  coingeckoSupports
+  p2pRateProvider,
+  routeByCoverage(coingeckoRateProvider, exchangeRateProvider, coingeckoSupports),
+  p2pSupports
 );
 
 export function useRate(
