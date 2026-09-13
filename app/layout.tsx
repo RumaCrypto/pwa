@@ -17,10 +17,8 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Ruma",
   },
-  icons: {
-    icon: "/icons/icon-512x512.png",
-    apple: "/icons/apple-touch-icon.png",
-  },
+  // Icons come from app/icon.svg and app/apple-icon.png via Next's file
+  // convention, which emits the link tags itself.
 };
 
 // Privy's SDK touches browser-only globals during its client render; every

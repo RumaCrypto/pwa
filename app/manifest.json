@@ -1,6 +1,7 @@
 {
-  "name": "My Awesome PWA app",
-  "short_name": "PWA App",
+  "name": "Ruma",
+  "short_name": "Ruma",
+  "description": "Buy and sell USDC with your local currency.",
   "icons": [
     {
       "src": "/icons/android-chrome-192x192.png",
@@ -14,8 +15,8 @@
       "type": "image/png"
     }
   ],
-  "theme_color": "#FFFFFF",
-  "background_color": "#FFFFFF",
+  "theme_color": "#0057ff",
+  "background_color": "#fafafa",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait"
