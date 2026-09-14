@@ -385,7 +385,6 @@
   "contacts.payout.cash": "Efectivo en punto Ruma",
   "contacts.payout.ruma.placeholder": "usuario",
   "contacts.payout.cash.placeholder": "Punto de retiro",
-  "contacts.payout.local.placeholder": "Cuenta, alias o número de teléfono",
   "sendFlow.step1.title": "¿A quién le envías?",
   "sendFlow.step1.addNew": "Agregar a alguien nuevo",
   "sendFlow.step1.addNewHint": "Con su clave Pix, su cuenta o su teléfono",

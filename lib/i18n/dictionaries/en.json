@@ -385,7 +385,6 @@
   "contacts.payout.cash": "Cash at a Ruma point",
   "contacts.payout.ruma.placeholder": "username",
   "contacts.payout.cash.placeholder": "Pickup point",
-  "contacts.payout.local.placeholder": "Account, alias, or phone number",
   "sendFlow.step1.title": "Who are you sending to?",
   "sendFlow.step1.addNew": "Add someone new",
   "sendFlow.step1.addNewHint": "With their Pix key, account or phone",

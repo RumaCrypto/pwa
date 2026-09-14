@@ -15,7 +15,7 @@ import { typography } from "@/constants/typography";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { LOCALES } from "@/lib/i18n/languages";
 import { useContacts } from "@/lib/contacts/contacts-context";
-import { countryName, displayName } from "@/lib/contacts/contacts";
+import { countryName, displayName, payoutReferenceDisplay } from "@/lib/contacts/contacts";
 import { useSend } from "@/lib/send/send-context";
 import { useMoney } from "@/lib/money/money-context";
 import { isExpired } from "@/lib/send/quote";
@@ -96,7 +96,7 @@ export default function SendReviewStep() {
         <ListRow
           leading={<Avatar name={name} />}
           title={contact.name}
-          subtitle={`${contact.payout.reference} · ${countryName(contact.country, language)}`}
+          subtitle={`${payoutReferenceDisplay(contact)} · ${countryName(contact.country, language)}`}
           chevron
           onClick={() => router.replace("/send")}
         />

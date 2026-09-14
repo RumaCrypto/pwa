@@ -1,4 +1,12 @@
-import { COUNTRY_OPTIONS, type CurrencyCode as SdkCurrencyCode } from "@p2pdotme/sdk/country";
+import {
+  COUNTRY_OPTIONS,
+  PAYMENT_ID_FIELDS,
+  formatStoredPaymentIdForDisplay,
+  packStoredPaymentId,
+  validateStoredPaymentId,
+  type CurrencyCode as SdkCurrencyCode,
+  type PaymentIdFieldConfig,
+} from "@p2pdotme/sdk/country";
 
 import { currencyForCountry, type CurrencyCode } from "@/lib/money/currencies";
 import { LOCALES, type Language } from "@/lib/i18n/languages";
@@ -54,6 +62,51 @@ export function payoutKindsFor(country: string, flags: Flags = FLAGS): PayoutKin
 /** Display name for a country's p2p.me local payout method, e.g. "PagoMovil" for Venezuela. */
 export function localPayoutLabel(country: string): string | undefined {
   return LOCAL_PAYOUT_METHODS[country];
+}
+
+/**
+ * The typed fields p2p.me needs to place a sell order through this country's
+ * local method — one field for Bre-B (an alias), five for Ecuador's bank
+ * transfer (bank, account type, account number, name, cédula).
+ */
+export function localPayoutFields(country: string): readonly PaymentIdFieldConfig[] {
+  return PAYMENT_ID_FIELDS[sdkCurrencyForCountry(country)] ?? [];
+}
+
+/** Packs a country's local-method field values into the string stored as `Payout.reference`. */
+export function packLocalPayoutReference(country: string, fieldValues: Record<string, string>): string {
+  return packStoredPaymentId(sdkCurrencyForCountry(country), null, fieldValues);
+}
+
+/**
+ * Validates local-method field values against p2p.me's rules for the
+ * country, returning the first failing field's error message, or null once
+ * the values would place a valid sell order.
+ */
+export function validateLocalPayoutFields(country: string, fieldValues: Record<string, string>): string | null {
+  const currency = sdkCurrencyForCountry(country);
+  if (validateStoredPaymentId(currency, packStoredPaymentId(currency, null, fieldValues))) return null;
+
+  const fields = localPayoutFields(country);
+  const blank = fields.find((field) => !field.optional && !(fieldValues[field.key] ?? "").trim());
+  if (blank) return blank.validationErrorMessage;
+
+  const invalid = fields.find((field) => {
+    const value = (fieldValues[field.key] ?? "").trim();
+    return value.length > 0 && !field.validate(value);
+  });
+  return invalid?.validationErrorMessage ?? fields[0]?.validationErrorMessage ?? null;
+}
+
+/** Human-readable form of a stored local-method reference, e.g. labeled fields for Ecuador's bank transfer. */
+export function formatLocalPayoutReference(country: string, reference: string): string {
+  return formatStoredPaymentIdForDisplay(sdkCurrencyForCountry(country), reference);
+}
+
+/** Human-readable form of a contact's payout reference — labeled fields for local methods, verbatim otherwise. */
+export function payoutReferenceDisplay(contact: Contact): string {
+  if (contact.payout.kind !== "local") return contact.payout.reference;
+  return formatLocalPayoutReference(contact.country, contact.payout.reference) || contact.payout.reference;
 }
 
 export function currencyOf(contact: Contact): CurrencyCode {

@@ -14,7 +14,13 @@ import { typography } from "@/constants/typography";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { useContacts } from "@/lib/contacts/contacts-context";
-import { countryName, displayName, localPayoutLabel, type Contact } from "@/lib/contacts/contacts";
+import {
+  countryName,
+  displayName,
+  localPayoutLabel,
+  payoutReferenceDisplay,
+  type Contact,
+} from "@/lib/contacts/contacts";
 import { useSend } from "@/lib/send/send-context";
 
 export default function SendRecipientStep() {
@@ -88,7 +94,7 @@ export default function SendRecipientStep() {
                 contact.payout.kind === "local"
                   ? localPayoutLabel(contact.country)
                   : t(`contacts.payout.${contact.payout.kind}` as "contacts.payout.ruma" | "contacts.payout.cash")
-              } ·· ${contact.payout.reference}`}
+              } ·· ${payoutReferenceDisplay(contact)}`}
               chevron
               onClick={() => choose(contact)}
             />
