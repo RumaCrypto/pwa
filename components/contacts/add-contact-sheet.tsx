@@ -10,7 +10,14 @@ import { typography } from "@/constants/typography";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { useContacts } from "@/lib/contacts/contacts-context";
-import { COUNTRIES, countryName, payoutKindsFor, type Contact, type PayoutKind } from "@/lib/contacts/contacts";
+import {
+  COUNTRIES,
+  countryName,
+  localPayoutLabel,
+  payoutKindsFor,
+  type Contact,
+  type PayoutKind,
+} from "@/lib/contacts/contacts";
 
 interface AddContactSheetProps {
   open: boolean;
@@ -106,7 +113,9 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
         <div className="flex flex-wrap gap-2">
           {kinds.map((option) => (
             <Choice key={option} selected={option === kind} onClick={() => setKind(option)}>
-              {t(`contacts.payout.${option}` as `contacts.payout.${PayoutKind}`)}
+              {option === "local"
+                ? localPayoutLabel(country)
+                : t(`contacts.payout.${option}` as "contacts.payout.ruma" | "contacts.payout.cash")}
             </Choice>
           ))}
         </div>
@@ -116,7 +125,13 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
         <Input
           value={reference}
           onChange={(event) => setReference(event.target.value)}
-          placeholder={t(`contacts.payout.${kind}.placeholder` as `contacts.payout.${PayoutKind}.placeholder`)}
+          placeholder={t(
+            kind === "local"
+              ? "contacts.payout.local.placeholder"
+              : (`contacts.payout.${kind}.placeholder` as
+                  | "contacts.payout.ruma.placeholder"
+                  | "contacts.payout.cash.placeholder")
+          )}
         />
       </Field>
 

@@ -14,7 +14,7 @@ import { typography } from "@/constants/typography";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { LOCALES } from "@/lib/i18n/languages";
 import { useContacts } from "@/lib/contacts/contacts-context";
-import { countryName, displayName } from "@/lib/contacts/contacts";
+import { countryName, displayName, localPayoutLabel } from "@/lib/contacts/contacts";
 import { useSend } from "@/lib/send/send-context";
 import { useMoney } from "@/lib/money/money-context";
 import { useOrderTracking } from "@/lib/send/use-order-tracking";
@@ -134,7 +134,11 @@ export default function SendTrackingScreen() {
           label={t("sendFlow.track.receivesIn")}
           value={
             contact
-              ? `${t(`contacts.payout.${contact.payout.kind}` as "contacts.payout.pix")} ·· ${contact.payout.reference}`
+              ? `${
+                  contact.payout.kind === "local"
+                    ? localPayoutLabel(contact.country)
+                    : t(`contacts.payout.${contact.payout.kind}` as "contacts.payout.ruma" | "contacts.payout.cash")
+                } ·· ${contact.payout.reference}`
               : "—"
           }
         />
