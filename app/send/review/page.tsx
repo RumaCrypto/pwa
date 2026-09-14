@@ -96,7 +96,7 @@ export default function SendReviewStep() {
         <ListRow
           leading={<Avatar name={name} />}
           title={contact.name}
-          subtitle={`${payoutReferenceDisplay(contact)} · ${countryName(contact.country, language)}`}
+          subtitle={`${payoutReferenceDisplay(contact, language)} · ${countryName(contact.country, language)}`}
           chevron
           onClick={() => router.replace("/send")}
         />

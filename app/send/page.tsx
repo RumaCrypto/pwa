@@ -94,7 +94,7 @@ export default function SendRecipientStep() {
                 contact.payout.kind === "local"
                   ? localPayoutLabel(contact.country)
                   : t(`contacts.payout.${contact.payout.kind}` as "contacts.payout.ruma" | "contacts.payout.cash")
-              } ·· ${payoutReferenceDisplay(contact)}`}
+              } ·· ${payoutReferenceDisplay(contact, language)}`}
               chevron
               onClick={() => choose(contact)}
             />

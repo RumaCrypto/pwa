@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   formatLocalPayoutReference,
+  localPayoutFieldLabel,
+  localPayoutFieldPlaceholder,
   localPayoutFields,
   localPayoutLabel,
   packLocalPayoutReference,
@@ -128,15 +130,38 @@ describe("validateLocalPayoutFields and packLocalPayoutReference", () => {
   });
 });
 
-describe("formatLocalPayoutReference and payoutReferenceDisplay", () => {
-  it("shows a single-field reference verbatim, without a label", () => {
-    expect(formatLocalPayoutReference("CO", "3001234567")).toBe("3001234567");
+describe("localPayoutFieldLabel and localPayoutFieldPlaceholder", () => {
+  it("overrides p2p.me's field label and placeholder, per language", () => {
+    const [bankName] = localPayoutFields("EC");
+    expect(localPayoutFieldLabel("EC", bankName, "en")).toBe("Bank");
+    expect(localPayoutFieldLabel("EC", bankName, "es")).toBe("Banco");
+    expect(localPayoutFieldLabel("EC", bankName, "pt")).toBe("Banco");
+    expect(localPayoutFieldPlaceholder("EC", bankName, "es")).toBe("Banco Pichincha");
   });
 
-  it("labels each part of a multi-field reference", () => {
+  it("falls back to the p2p.me default for a field with no override", () => {
+    const fakeField = {
+      key: "not-overridden",
+      label: "RAW",
+      displayLabel: "Raw label",
+      placeholder: "raw",
+      validate: () => true,
+      validationErrorMessage: "invalid",
+    };
+    expect(localPayoutFieldLabel("EC", fakeField, "en")).toBe("Raw label");
+    expect(localPayoutFieldPlaceholder("EC", fakeField, "en")).toBe("raw");
+  });
+});
+
+describe("formatLocalPayoutReference and payoutReferenceDisplay", () => {
+  it("shows a single-field reference verbatim, without a label", () => {
+    expect(formatLocalPayoutReference("CO", "3001234567", "en")).toBe("3001234567");
+  });
+
+  it("labels each part of a multi-field reference using our overridden labels", () => {
     const reference = "Banco Pichincha|Savings|2100123456|Juan Perez|1710034065";
-    expect(formatLocalPayoutReference("EC", reference)).toBe(
-      "Bank: Banco Pichincha | Account Type: Savings | Account Number: 2100123456 | Name: Juan Perez | Cédula: 1710034065"
+    expect(formatLocalPayoutReference("EC", reference, "es")).toBe(
+      "Banco: Banco Pichincha | Tipo de cuenta: Savings | Número de cuenta: 2100123456 | Nombre del titular: Juan Perez | Cédula / RUC: 1710034065"
     );
   });
 
@@ -147,9 +172,9 @@ describe("formatLocalPayoutReference and payoutReferenceDisplay", () => {
       country: "EC",
       payout: { kind: "local", reference: "Banco Pichincha|Savings|2100123456|Juan Perez|1710034065" },
     };
-    expect(payoutReferenceDisplay(local)).toContain("Bank: Banco Pichincha");
+    expect(payoutReferenceDisplay(local, "en")).toContain("Bank: Banco Pichincha");
 
     const ruma: Contact = { id: "2", name: "Rosa", country: "EC", payout: { kind: "ruma", reference: "rosa123" } };
-    expect(payoutReferenceDisplay(ruma)).toBe("rosa123");
+    expect(payoutReferenceDisplay(ruma, "en")).toBe("rosa123");
   });
 });

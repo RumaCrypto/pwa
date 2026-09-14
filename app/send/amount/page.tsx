@@ -76,7 +76,7 @@ export default function SendAmountStep() {
         <ListRow
           leading={<Avatar name={displayName(contact)} />}
           title={contact.name}
-          subtitle={`${countryName(contact.country, language)} · ${payoutReferenceDisplay(contact)}`}
+          subtitle={`${countryName(contact.country, language)} · ${payoutReferenceDisplay(contact, language)}`}
           trailing={
             <span style={typography.body3} className="shrink-0 text-text-secondary">
               {t("sendFlow.step2.change")}

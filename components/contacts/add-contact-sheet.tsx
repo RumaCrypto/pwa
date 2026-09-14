@@ -13,6 +13,8 @@ import { useContacts } from "@/lib/contacts/contacts-context";
 import {
   COUNTRIES,
   countryName,
+  localPayoutFieldLabel,
+  localPayoutFieldPlaceholder,
   localPayoutFields,
   localPayoutLabel,
   packLocalPayoutReference,
@@ -143,11 +145,11 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
 
       {kind === "local" ? (
         fields.map((field) => (
-          <Field key={field.key} label={field.displayLabel ?? field.label}>
+          <Field key={field.key} label={localPayoutFieldLabel(country, field, language)}>
             <Input
               value={fieldValues[field.key] ?? ""}
               onChange={(event) => setFieldValue(field.key, event.target.value)}
-              placeholder={field.placeholder}
+              placeholder={localPayoutFieldPlaceholder(country, field, language)}
             />
           </Field>
         ))

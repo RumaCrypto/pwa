@@ -1,7 +1,7 @@
 import {
   COUNTRY_OPTIONS,
   PAYMENT_ID_FIELDS,
-  formatStoredPaymentIdForDisplay,
+  deserializeCompoundPaymentId,
   packStoredPaymentId,
   validateStoredPaymentId,
   type CurrencyCode as SdkCurrencyCode,
@@ -29,6 +29,109 @@ const LOCAL_PAYOUT_METHODS: Record<string, string> = {
   CO: "Bre-B", // p2p.me: TRANSFERENCIA
   EC: "Banco", // p2p.me: TRANSFERENCIA
   PE: "Yape / Plin", // p2p.me: YAPE_PLIN_CCI
+};
+
+interface LocalPayoutFieldOverride {
+  readonly label: Record<Language, string>;
+  readonly placeholder: Record<Language, string>;
+}
+
+/**
+ * Overrides for a local-method field's label and placeholder, keyed by
+ * country then by `PaymentIdFieldConfig.key`. p2p.me's own `displayLabel` /
+ * `placeholder` are English-only and inconsistently worded across countries
+ * (e.g. Colombia's field is labeled "Nequi / Daviplata / Bre-B") — this is
+ * the single place to fix wording or add a language without touching the
+ * SDK. A field left out of a country's map falls back to the SDK's default,
+ * untranslated.
+ */
+const LOCAL_PAYOUT_FIELD_OVERRIDES: Record<string, Record<string, LocalPayoutFieldOverride>> = {
+  BR: {
+    pix: {
+      label: { en: "Pix key", es: "Clave Pix", pt: "Chave Pix" },
+      placeholder: {
+        en: "Pix key, email, phone, or code",
+        es: "Clave Pix, correo, teléfono o código",
+        pt: "Chave Pix, e-mail, telefone ou código",
+      },
+    },
+  },
+  AR: {
+    alias: {
+      label: { en: "Alias / CBU", es: "Alias / CBU", pt: "Alias / CBU" },
+      placeholder: { en: "juan.perez", es: "juan.perez", pt: "juan.perez" },
+    },
+  },
+  VE: {
+    phone: {
+      label: { en: "Phone number", es: "Número de teléfono", pt: "Número de telefone" },
+      placeholder: { en: "04121234567", es: "04121234567", pt: "04121234567" },
+    },
+    rif: {
+      label: { en: "Cédula / RIF", es: "Cédula / RIF", pt: "Cédula / RIF" },
+      placeholder: { en: "V12345678", es: "V12345678", pt: "V12345678" },
+    },
+    bank: {
+      label: { en: "Bank", es: "Banco", pt: "Banco" },
+      placeholder: { en: "Banesco", es: "Banesco", pt: "Banesco" },
+    },
+  },
+  BO: {
+    account: {
+      label: { en: "Account number", es: "Número de cuenta", pt: "Número da conta" },
+      placeholder: {
+        en: "8–20 digit account number",
+        es: "Número de cuenta (8 a 20 dígitos)",
+        pt: "Número da conta (8 a 20 dígitos)",
+      },
+    },
+  },
+  CO: {
+    alias: {
+      label: {
+        en: "Bre-B key",
+        es: "Llave Bre-B",
+        pt: "Llave Bre-B",
+      },
+      placeholder: {
+        en: "@jhon.doe",
+        es: "@juan.perez",
+        pt: "@juan.pereira",
+      },
+    },
+  },
+  EC: {
+    "bank-name": {
+      label: { en: "Bank", es: "Banco", pt: "Banco" },
+      placeholder: { en: "Banco Pichincha", es: "Banco Pichincha", pt: "Banco Pichincha" },
+    },
+    "account-type": {
+      label: { en: "Account type", es: "Tipo de cuenta", pt: "Tipo de conta" },
+      placeholder: { en: "Savings or checking", es: "Ahorros o corriente", pt: "Poupança ou corrente" },
+    },
+    "account-number": {
+      label: { en: "Account number", es: "Número de cuenta", pt: "Número da conta" },
+      placeholder: { en: "2100123456", es: "2100123456", pt: "2100123456" },
+    },
+    "account-name": {
+      label: { en: "Account holder name", es: "Nombre del titular", pt: "Nome do titular" },
+      placeholder: { en: "Juan Pérez", es: "Juan Pérez", pt: "Juan Pérez" },
+    },
+    cedula: {
+      label: { en: "Cédula / RUC", es: "Cédula / RUC", pt: "Cédula / RUC" },
+      placeholder: { en: "1710034065", es: "1710034065", pt: "1710034065" },
+    },
+  },
+  PE: {
+    phone: {
+      label: { en: "Yape / Plin phone", es: "Teléfono Yape / Plin", pt: "Telefone Yape / Plin" },
+      placeholder: { en: "987654321", es: "987654321", pt: "987654321" },
+    },
+    cci: {
+      label: { en: "CCI", es: "CCI", pt: "CCI" },
+      placeholder: { en: "20-digit CCI", es: "CCI de 20 dígitos", pt: "CCI de 20 dígitos" },
+    },
+  },
 };
 
 export type PayoutKind = "ruma" | "cash" | "local";
@@ -73,6 +176,16 @@ export function localPayoutFields(country: string): readonly PaymentIdFieldConfi
   return PAYMENT_ID_FIELDS[sdkCurrencyForCountry(country)] ?? [];
 }
 
+/** Display label for a local-method field, overridden per `LOCAL_PAYOUT_FIELD_OVERRIDES` when set. */
+export function localPayoutFieldLabel(country: string, field: PaymentIdFieldConfig, language: Language): string {
+  return LOCAL_PAYOUT_FIELD_OVERRIDES[country]?.[field.key]?.label[language] ?? field.displayLabel ?? field.label;
+}
+
+/** Input placeholder for a local-method field, overridden per `LOCAL_PAYOUT_FIELD_OVERRIDES` when set. */
+export function localPayoutFieldPlaceholder(country: string, field: PaymentIdFieldConfig, language: Language): string {
+  return LOCAL_PAYOUT_FIELD_OVERRIDES[country]?.[field.key]?.placeholder[language] ?? field.placeholder;
+}
+
 /** Packs a country's local-method field values into the string stored as `Payout.reference`. */
 export function packLocalPayoutReference(country: string, fieldValues: Record<string, string>): string {
   return packStoredPaymentId(sdkCurrencyForCountry(country), null, fieldValues);
@@ -98,15 +211,28 @@ export function validateLocalPayoutFields(country: string, fieldValues: Record<s
   return invalid?.validationErrorMessage ?? fields[0]?.validationErrorMessage ?? null;
 }
 
-/** Human-readable form of a stored local-method reference, e.g. labeled fields for Ecuador's bank transfer. */
-export function formatLocalPayoutReference(country: string, reference: string): string {
-  return formatStoredPaymentIdForDisplay(sdkCurrencyForCountry(country), reference);
+/**
+ * Human-readable form of a stored local-method reference, using our own
+ * field labels (see `localPayoutFieldLabel`) rather than p2p.me's.
+ */
+export function formatLocalPayoutReference(country: string, reference: string, language: Language): string {
+  const fields = localPayoutFields(country);
+  if (fields.length <= 1) return reference;
+
+  const parts = deserializeCompoundPaymentId(reference);
+  return fields
+    .map((field, i) => {
+      const value = (parts[i] ?? "").trim();
+      return value ? `${localPayoutFieldLabel(country, field, language)}: ${value}` : null;
+    })
+    .filter((part): part is string => part !== null)
+    .join(" | ");
 }
 
 /** Human-readable form of a contact's payout reference — labeled fields for local methods, verbatim otherwise. */
-export function payoutReferenceDisplay(contact: Contact): string {
+export function payoutReferenceDisplay(contact: Contact, language: Language): string {
   if (contact.payout.kind !== "local") return contact.payout.reference;
-  return formatLocalPayoutReference(contact.country, contact.payout.reference) || contact.payout.reference;
+  return formatLocalPayoutReference(contact.country, contact.payout.reference, language) || contact.payout.reference;
 }
 
 export function currencyOf(contact: Contact): CurrencyCode {
