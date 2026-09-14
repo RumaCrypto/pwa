@@ -35,7 +35,7 @@ export default function SendAmountStep() {
 
   const contact = contactId ? findContact(contactId) : undefined;
   const target = contact ? currencyOf(contact) : "USD";
-  const { rate, loading, error } = useRate("USD", target);
+  const { rate, loading, error } = useRate("USD", target, contact?.country);
   const { limits } = useLimits();
 
   useEffect(() => {

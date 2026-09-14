@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CURRENCY_CODES, type CurrencyCode } from "./currencies";
 import { coingeckoRateProvider, coingeckoSupports } from "./coingecko";
 import { exchangeRateProvider } from "./exchangerate";
-import { p2pRateProvider, p2pSupports } from "./p2p-prices";
+import { p2pRateProvider, p2pSupports, p2pCountryOverrideRate } from "./p2p-prices";
 import { routeByCoverage } from "./compose-rates";
 
 export interface RateProvider {
@@ -48,9 +48,16 @@ export const defaultRateProvider: RateProvider = routeByCoverage(
   p2pSupports
 );
 
+/**
+ * `country`, when given, is checked against p2p.me's country-level overrides
+ * before `from`/`to` ever reach `provider` — currency codes alone can't tell
+ * an Ecuador payout from a US-dollar balance, both "USD", but p2p.me prices
+ * them differently. See `p2pCountryOverrideRate`.
+ */
 export function useRate(
   from: CurrencyCode,
   to: CurrencyCode,
+  country?: string,
   provider: RateProvider = defaultRateProvider
 ): RateState {
   const [state, setState] = useState<RateState>({ rate: null, loading: true, error: null });
@@ -59,7 +66,15 @@ export function useRate(
     let active = true;
     setState({ rate: null, loading: true, error: null });
 
-    provider.getRate(from, to).then(
+    const fetchRate = async () => {
+      if (country && from === "USD" && to === "USD") {
+        const override = await p2pCountryOverrideRate(country);
+        if (override !== null) return override;
+      }
+      return provider.getRate(from, to);
+    };
+
+    fetchRate().then(
       (rate) => active && setState({ rate, loading: false, error: null }),
       (error: Error) => active && setState({ rate: null, loading: false, error })
     );
@@ -67,7 +82,7 @@ export function useRate(
     return () => {
       active = false;
     };
-  }, [from, to, provider]);
+  }, [from, to, country, provider]);
 
   return state;
 }

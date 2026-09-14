@@ -17,6 +17,17 @@ const SDK_CURRENCY: Partial<Record<CurrencyCode, SdkCurrencyCode>> = {
   BOB: "BOB",
 };
 
+/**
+ * Countries whose payout currency this app shows as plain USD (`currencyOf`
+ * maps them to "USD") but whose own p2p.me corridor still floats — Ecuador's
+ * "ECU" sell price is currently ~0.98, not 1:1. `from === to === "USD"`
+ * can't tell a US-dollar balance from an Ecuador payout apart, so this is
+ * keyed by country and checked before currency-only routing ever runs.
+ */
+const SDK_CURRENCY_BY_COUNTRY: Partial<Record<string, SdkCurrencyCode>> = {
+  EC: "ECU",
+};
+
 export function p2pSupports(currency: CurrencyCode): boolean {
   return currency === "USD" || currency in SDK_CURRENCY;
 }
@@ -30,21 +41,24 @@ export function sellPriceToRate(sellPrice: bigint): number {
 
 /** Rates track the protocol's on-chain config, not by the second. */
 const TTL_MS = 60_000;
-const cache = new Map<CurrencyCode, { rate: number; fetchedAt: number }>();
+const cache = new Map<SdkCurrencyCode, { rate: number; fetchedAt: number }>();
 
-async function sellRateFor(prices: Prices, currency: CurrencyCode): Promise<number> {
-  const cached = cache.get(currency);
+async function sellRateForSdkCode(prices: Prices, sdkCode: SdkCurrencyCode): Promise<number> {
+  const cached = cache.get(sdkCode);
   if (cached && Date.now() - cached.fetchedAt < TTL_MS) return cached.rate;
-
-  const sdkCode = SDK_CURRENCY[currency];
-  if (!sdkCode) throw new Error(`p2p.me does not quote ${currency}`);
 
   const result = await prices.getPriceConfig({ currency: sdkCode });
   if (result.isErr()) throw result.error;
 
   const rate = sellPriceToRate(result.value.sellPrice);
-  cache.set(currency, { rate, fetchedAt: Date.now() });
+  cache.set(sdkCode, { rate, fetchedAt: Date.now() });
   return rate;
+}
+
+async function sellRateFor(prices: Prices, currency: CurrencyCode): Promise<number> {
+  const sdkCode = SDK_CURRENCY[currency];
+  if (!sdkCode) throw new Error(`p2p.me does not quote ${currency}`);
+  return sellRateForSdkCode(prices, sdkCode);
 }
 
 /**
@@ -64,12 +78,26 @@ export function createP2pRateProvider(prices: Prices): RateProvider {
   };
 }
 
+/**
+ * The p2p.me rate for a country whose currency code alone is ambiguous with
+ * USD (see `SDK_CURRENCY_BY_COUNTRY`), or `null` for a country with no such
+ * override — callers should fall through to ordinary currency-keyed routing.
+ */
+export function createP2pCountryOverride(prices: Prices) {
+  return async function p2pCountryOverrideRate(country: string): Promise<number | null> {
+    const sdkCode = SDK_CURRENCY_BY_COUNTRY[country];
+    if (!sdkCode) return null;
+    return sellRateForSdkCode(prices, sdkCode);
+  };
+}
+
 const p2pPrices = createPrices({
   publicClient: baseClient,
   diamondAddress: DIAMOND_ADDRESS ?? "0x0000000000000000000000000000000000000000",
 });
 
 export const p2pRateProvider: RateProvider = createP2pRateProvider(p2pPrices);
+export const p2pCountryOverrideRate = createP2pCountryOverride(p2pPrices);
 
 /** Exposed so tests and manual checks aren't served a warm cache. */
 export function clearP2pRateCache(): void {
