@@ -41,11 +41,6 @@ export interface Order {
   completedAt?: Date;
 }
 
-/** Matches the "RM-719049" format in the designs; the on-chain id is a separate, larger number. */
-export function newOrderId(): string {
-  return `RM-${Math.floor(100_000 + Math.random() * 900_000)}`;
-}
-
 export function stageIndex(stage: Stage): number {
   return STAGES.indexOf(stage);
 }

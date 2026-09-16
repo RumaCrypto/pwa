@@ -7,7 +7,7 @@ import type { Contact } from "@/lib/contacts/contacts";
 import { sdkCurrencyForCountry } from "@/lib/contacts/contacts";
 import { getP2pOrders } from "./p2p-orders";
 import { placeSellOrder } from "./order-execution";
-import { newOrderId, type Order } from "./orders";
+import type { Order } from "./orders";
 import type { Quote } from "./quote";
 
 const ORDERS_KEY = "ruma-orders";
@@ -115,7 +115,10 @@ export function SendProvider({ children }: { children: ReactNode }) {
     });
 
     const order: Order = {
-      id: newOrderId(),
+      // The on-chain id the SDK assigns when placing the order — the same
+      // id a merchant sees and accepts against, so it doubles as this app's
+      // order id rather than a locally-generated placeholder.
+      id: p2pOrderId.toString(),
       contactId: contact.id,
       quote: placed,
       createdAt: new Date(),
