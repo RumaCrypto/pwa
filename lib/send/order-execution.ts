@@ -92,10 +92,11 @@ export interface SubmitPayoutAddressParams {
 }
 
 /**
- * Encrypts the contact's payout reference for the accepted merchant and
- * publishes it on the order, so the merchant knows where to send the fiat.
- * The signing identity is resolved (and, on first use, created) internally
- * from the `relayIdentityStore` the orders client was configured with.
+ * Publishes the contact's payout reference on the order, so the merchant
+ * knows where to send the fiat. The SDK encrypts it for the accepted
+ * merchant internally. The signing identity is resolved (and, on first use,
+ * created) internally from the `relayIdentityStore` the orders client was
+ * configured with.
  */
 export async function submitPayoutAddress({
   orders,
@@ -105,15 +106,9 @@ export async function submitPayoutAddress({
   updatedAmount,
   paymentAddress,
 }: SubmitPayoutAddressParams): Promise<void> {
-  const encryptedResult = await orders.encryptPaymentAddress({
-    paymentAddress,
-    recipientPublicKey: merchantPublicKey,
-  });
-  if (encryptedResult.isErr()) throw encryptedResult.error;
-
   const setUpiResult = await orders.setSellOrderUpi.execute({
     orderId,
-    paymentAddress: encryptedResult.value,
+    paymentAddress,
     merchantPublicKey,
     updatedAmount,
     walletClient: toSdkWalletClient(walletClient),
