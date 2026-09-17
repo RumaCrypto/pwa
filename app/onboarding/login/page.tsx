@@ -8,6 +8,7 @@ import clsx from "clsx";
 import { usePrivy, useLoginWithEmail, useLoginWithPasskey, useCreateWallet } from "@privy-io/react-auth";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { typography } from "@/constants/typography";
 
 type Step = "method" | "email" | "code";
@@ -98,15 +99,13 @@ export default function LoginMethodStep() {
                 {t("onboarding.email.description")}
               </p>
             </div>
-            <input
+            <Input
               type="email"
               inputMode="email"
               autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder={t("onboarding.email.placeholder")}
-              style={typography.body1}
-              className="h-14 rounded-xl border border-border-light bg-white px-4 outline-none focus:border-primary"
             />
           </>
         )}
