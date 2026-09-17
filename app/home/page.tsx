@@ -162,7 +162,7 @@ export default function HomePage() {
             label={displayName(contact)}
             onClick={() => sendToContact(contact)}
           >
-            {/* Initials come from the short name, so "Rosa Cedeño" is R, not RC. */}
+            {/* Initials come from the first word of the name, so "Rosa Cedeño" is R, not RC. */}
             <Avatar name={displayName(contact)} />
           </ContactButton>
         ))}
