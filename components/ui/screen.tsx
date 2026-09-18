@@ -45,7 +45,7 @@ export function Screen({ children, title, onBack, backLabel, step, footer, class
         </header>
       )}
 
-      <div className={clsx("flex flex-1 flex-col px-6 pb-8", title === undefined ? "pt-6" : "pt-8", className)}>
+      <div className={clsx("relative flex flex-1 flex-col px-6 pb-8", title === undefined ? "pt-6" : "pt-8", className)}>
         {children}
       </div>
 
