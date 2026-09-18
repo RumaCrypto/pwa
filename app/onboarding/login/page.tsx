@@ -7,6 +7,7 @@ import { OTPInput, SlotProps } from "input-otp";
 import clsx from "clsx";
 import { usePrivy, useLoginWithEmail, useLoginWithPasskey, useCreateWallet } from "@privy-io/react-auth";
 import { useI18n } from "@/lib/i18n/i18n-context";
+import { useResidency } from "@/lib/settings/residency-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { typography } from "@/constants/typography";
@@ -20,6 +21,7 @@ export default function LoginMethodStep() {
   const { sendCode, loginWithCode, state: emailState } = useLoginWithEmail();
   const { loginWithPasskey, state: passkeyState } = useLoginWithPasskey();
   const { createWallet } = useCreateWallet();
+  const { country, loaded: residencyLoaded } = useResidency();
 
   const [step, setStep] = useState<Step>("method");
   const [email, setEmail] = useState("");
@@ -27,8 +29,11 @@ export default function LoginMethodStep() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (authenticated) router.replace("/home");
-  }, [authenticated, router]);
+    // Wait on `residencyLoaded` so a returning user with a country already
+    // saved isn't bounced through the country step on every login.
+    if (!authenticated || !residencyLoaded) return;
+    router.replace(country ? "/home" : "/onboarding/country");
+  }, [authenticated, residencyLoaded, country, router]);
 
   const handlePasskey = async () => {
     setError(null);
