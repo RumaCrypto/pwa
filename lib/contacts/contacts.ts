@@ -8,7 +8,7 @@ import {
   type PaymentIdFieldConfig,
 } from "@p2pdotme/sdk/country";
 
-import { currencyForCountry, type CurrencyCode } from "@/lib/money/currencies";
+import { CURRENCIES, CURRENCY_CODES, currencyForCountry, type CurrencyCode } from "@/lib/money/currencies";
 import { LOCALES, type Language } from "@/lib/i18n/languages";
 import { FLAGS, type Flags } from "@/lib/flags";
 
@@ -151,6 +151,17 @@ export interface Contact {
   payout: Payout;
 }
 
+/** Every country in the currency catalogue, whether or not money can reach it. */
+export const CATALOGUE_COUNTRIES: string[] = CURRENCY_CODES.flatMap(
+  (code) => CURRENCIES[code].countries as readonly string[]
+);
+
+/**
+ * Countries a contact can be created in. Taken from p2p.me's own country list
+ * minus the corridors it has disabled, so a country never appears without a
+ * payout market — which would let someone save a contact who could never be
+ * paid.
+ */
 export const COUNTRIES: string[] = COUNTRY_OPTIONS.filter(
   (option) => SUPPORTED_SENDING_COUNTRIES.includes(option.country) && !option.disabled
 ).map((option) => option.locale.split("-")[1]);
