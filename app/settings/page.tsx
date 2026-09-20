@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { usePrivy } from "@privy-io/react-auth";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { LANGUAGES, type Language } from "@/lib/i18n/languages";
 import { useMoney } from "@/lib/money/money-context";
@@ -14,6 +16,13 @@ import { typography } from "@/constants/typography";
 export default function SettingsPage() {
   const { t, language, setLanguage } = useI18n();
   const { displayCurrency, setDisplayCurrency, format } = useMoney();
+  const { logout } = usePrivy();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await logout();
+    router.replace("/onboarding");
+  };
 
   return (
     <Screen title={t("settings")} backLabel={t("common.back")}>
@@ -49,6 +58,12 @@ export default function SettingsPage() {
       </Section>
 
       <Callout title={t("tabs.home.balance")}>{format(fromNumber(1080.5, displayCurrency))}</Callout>
+
+      <Section title={t("settings.security")}>
+        <Card divided>
+          <ListRow title={t("settings.signOut")} className="text-danger" onClick={handleSignOut} />
+        </Card>
+      </Section>
     </Screen>
   );
 }

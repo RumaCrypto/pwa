@@ -45,6 +45,14 @@ export default function HomePage() {
   const { contacts } = useContacts();
   const { limits } = useLimits();
   const [addingContact, setAddingContact] = useState(false);
+  const [addressCopied, setAddressCopied] = useState(false);
+
+  const copyAddress = async () => {
+    if (!address) return;
+    await navigator.clipboard.writeText(address);
+    setAddressCopied(true);
+    setTimeout(() => setAddressCopied(false), 2000);
+  };
 
   useEffect(() => {
     if (ready && !authenticated) router.replace("/onboarding");
@@ -64,10 +72,18 @@ export default function HomePage() {
       }
     >
       <header className="flex items-center justify-between gap-3">
-        <Badge className="gap-2 py-1.5 pl-1.5 pr-3">
-          <span className="h-5 w-5 rounded-full bg-primary" />
-          <span>{user?.email?.address?.split("@")[0] ?? t("tabs.home.greeting")}</span>
-        </Badge>
+        <button onClick={copyAddress} disabled={!address} className="active:opacity-70">
+          <Badge className="gap-2 py-1.5 pl-1.5 pr-3">
+            <span className="h-5 w-5 rounded-full bg-primary" />
+            <span>
+              {addressCopied
+                ? t("common.copied")
+                : address
+                  ? truncateAddress(address)
+                  : t("tabs.home.greeting")}
+            </span>
+          </Badge>
+        </button>
 
         <div className="flex items-center gap-2">
           <button onClick={() => router.push("/pay")}>

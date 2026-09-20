@@ -10,7 +10,19 @@ import { typography } from "@/constants/typography";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { useContacts } from "@/lib/contacts/contacts-context";
-import { COUNTRIES, countryName, payoutKindsFor, type Contact, type PayoutKind } from "@/lib/contacts/contacts";
+import {
+  COUNTRIES,
+  countryName,
+  localPayoutFieldLabel,
+  localPayoutFieldPlaceholder,
+  localPayoutFields,
+  localPayoutLabel,
+  packLocalPayoutReference,
+  payoutKindsFor,
+  validateLocalPayoutFields,
+  type Contact,
+  type PayoutKind,
+} from "@/lib/contacts/contacts";
 
 interface AddContactSheetProps {
   open: boolean;
@@ -27,9 +39,11 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
   const [country, setCountry] = useState(COUNTRIES[0]);
   const [kind, setKind] = useState<PayoutKind>(payoutKindsFor(COUNTRIES[0])[0]);
   const [reference, setReference] = useState("");
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   const kinds = payoutKindsFor(country);
+  const fields = localPayoutFields(country);
 
   const reset = () => {
     setName("");
@@ -37,6 +51,7 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
     setCountry(COUNTRIES[0]);
     setKind(payoutKindsFor(COUNTRIES[0])[0]);
     setReference("");
+    setFieldValues({});
     setError(null);
   };
 
@@ -45,17 +60,31 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
     // The previous method may not exist in the new country — Pix outside Brazil.
     const available = payoutKindsFor(next);
     if (!available.includes(kind)) setKind(available[0]);
+    // A different country means different local-method fields (or none).
+    setFieldValues({});
   };
+
+  const setFieldValue = (key: string, value: string) =>
+    setFieldValues((current) => ({ ...current, [key]: value }));
 
   const handleSave = () => {
     if (!name.trim()) return setError(t("contacts.add.nameRequired"));
-    if (!reference.trim()) return setError(t("contacts.add.referenceRequired"));
+
+    let payoutReference: string;
+    if (kind === "local") {
+      const validationError = validateLocalPayoutFields(country, fieldValues);
+      if (validationError) return setError(validationError);
+      payoutReference = packLocalPayoutReference(country, fieldValues);
+    } else {
+      if (!reference.trim()) return setError(t("contacts.add.referenceRequired"));
+      payoutReference = reference.trim();
+    }
 
     const created = addContact({
       name: name.trim(),
       shortName: shortName.trim() || undefined,
       country,
-      payout: { kind, reference: reference.trim() },
+      payout: { kind, reference: payoutReference },
     });
 
     reset();
@@ -106,19 +135,37 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
         <div className="flex flex-wrap gap-2">
           {kinds.map((option) => (
             <Choice key={option} selected={option === kind} onClick={() => setKind(option)}>
-              {t(`contacts.payout.${option}` as `contacts.payout.${PayoutKind}`)}
+              {option === "local"
+                ? localPayoutLabel(country)
+                : t(`contacts.payout.${option}` as "contacts.payout.ruma" | "contacts.payout.cash")}
             </Choice>
           ))}
         </div>
       </Field>
 
-      <Field label={t("contacts.add.reference")}>
-        <Input
-          value={reference}
-          onChange={(event) => setReference(event.target.value)}
-          placeholder={t(`contacts.payout.${kind}.placeholder` as `contacts.payout.${PayoutKind}.placeholder`)}
-        />
-      </Field>
+      {kind === "local" ? (
+        fields.map((field) => (
+          <Field key={field.key} label={localPayoutFieldLabel(country, field, language)}>
+            <Input
+              value={fieldValues[field.key] ?? ""}
+              onChange={(event) => setFieldValue(field.key, event.target.value)}
+              placeholder={localPayoutFieldPlaceholder(country, field, language)}
+            />
+          </Field>
+        ))
+      ) : (
+        <Field label={t("contacts.add.reference")}>
+          <Input
+            value={reference}
+            onChange={(event) => setReference(event.target.value)}
+            placeholder={t(
+              `contacts.payout.${kind}.placeholder` as
+                | "contacts.payout.ruma.placeholder"
+                | "contacts.payout.cash.placeholder"
+            )}
+          />
+        </Field>
+      )}
 
       {error && (
         <p style={typography.body3} className="text-danger">

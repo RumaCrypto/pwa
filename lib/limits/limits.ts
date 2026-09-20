@@ -21,10 +21,10 @@ export interface Limits {
 }
 
 export const LEVELS: Limits[] = [
-  { level: 1, perSend: fromNumber(100, "USD"), perDay: fromNumber(1_000, "USD"), sendsPerDay: 10 },
-  { level: 2, perSend: fromNumber(500, "USD"), perDay: fromNumber(5_000, "USD"), sendsPerDay: 20 },
-  { level: 3, perSend: fromNumber(2_500, "USD"), perDay: fromNumber(25_000, "USD"), sendsPerDay: 50 },
-  { level: 4, perSend: fromNumber(10_000, "USD"), perDay: fromNumber(100_000, "USD"), sendsPerDay: 100 },
+  { level: 1, perSend: fromNumber(300, "USD"), perDay: fromNumber(3_000, "USD"), sendsPerDay: 10 },
+  { level: 2, perSend: fromNumber(375, "USD"), perDay: fromNumber(3_750, "USD"), sendsPerDay: 10 },
+  { level: 3, perSend: fromNumber(475, "USD"), perDay: fromNumber(5_750, "USD"), sendsPerDay: 10 },
+  { level: 4, perSend: fromNumber(675, "USD"), perDay: fromNumber(6_750, "USD"), sendsPerDay: 10 },
 ];
 
 export const MAX_LEVEL = LEVELS.length;

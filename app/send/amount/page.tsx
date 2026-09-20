@@ -15,7 +15,7 @@ import { typography } from "@/constants/typography";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { LOCALES } from "@/lib/i18n/languages";
 import { useContacts } from "@/lib/contacts/contacts-context";
-import { countryName, currencyOf, displayName } from "@/lib/contacts/contacts";
+import { countryName, currencyOf, displayName, payoutReferenceDisplay } from "@/lib/contacts/contacts";
 import { useSend } from "@/lib/send/send-context";
 import { useRate } from "@/lib/money/rates";
 import { useMoney } from "@/lib/money/money-context";
@@ -35,7 +35,7 @@ export default function SendAmountStep() {
 
   const contact = contactId ? findContact(contactId) : undefined;
   const target = contact ? currencyOf(contact) : "USD";
-  const { rate, loading, error } = useRate("USD", target);
+  const { rate, loading, error } = useRate("USD", target, contact?.country);
   const { limits } = useLimits();
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function SendAmountStep() {
         <ListRow
           leading={<Avatar name={displayName(contact)} />}
           title={contact.name}
-          subtitle={`${countryName(contact.country, language)} · ${contact.payout.reference}`}
+          subtitle={`${countryName(contact.country, language)} · ${payoutReferenceDisplay(contact, language)}`}
           trailing={
             <span style={typography.body3} className="shrink-0 text-text-secondary">
               {t("sendFlow.step2.change")}

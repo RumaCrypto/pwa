@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useState, useEffect, useMemo, ReactNode } from "react";
 import { translations, type TranslationKey } from "./translations";
-import { LOCALES, isLanguage, type Language } from "./languages";
+import { LOCALES, isLanguage, resolveLanguage, type Language } from "./languages";
 import { interpolate, pluralSuffix, type InterpolationValues } from "./interpolate";
 
 const LANGUAGE_KEY = "ruma-language";
@@ -19,8 +19,7 @@ const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 function detectBrowserLanguage(): Language {
   if (typeof navigator === "undefined") return "en";
-  const tag = navigator.language?.slice(0, 2).toLowerCase() ?? "";
-  return isLanguage(tag) ? tag : "en";
+  return resolveLanguage(navigator.languages?.length ? navigator.languages : [navigator.language ?? ""]);
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {

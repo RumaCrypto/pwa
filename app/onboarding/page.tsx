@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { Button } from "@/components/ui/button";
 import { Screen } from "@/components/ui/screen";
+import { LanguagePicker } from "@/components/ui/language-picker";
 import { typography } from "@/constants/typography";
 
 export default function OnboardingWelcome() {
@@ -19,6 +20,9 @@ export default function OnboardingWelcome() {
         </Button>
       }
     >
+      <div className="absolute right-6 top-6">
+        <LanguagePicker />
+      </div>
       <h1 style={typography.display3} className="mb-2">
         {t("onboarding.welcome.title")}
       </h1>

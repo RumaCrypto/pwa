@@ -14,7 +14,13 @@ import { typography } from "@/constants/typography";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { useContacts } from "@/lib/contacts/contacts-context";
-import { countryName, displayName, type Contact } from "@/lib/contacts/contacts";
+import {
+  countryName,
+  displayName,
+  localPayoutLabel,
+  payoutReferenceDisplay,
+  type Contact,
+} from "@/lib/contacts/contacts";
 import { useSend } from "@/lib/send/send-context";
 
 export default function SendRecipientStep() {
@@ -84,9 +90,11 @@ export default function SendRecipientStep() {
               key={contact.id}
               leading={<Avatar name={displayName(contact)} />}
               title={contact.name}
-              subtitle={`${countryName(contact.country, language)} · ${t(
-                `contacts.payout.${contact.payout.kind}` as "contacts.payout.pix"
-              )} ·· ${contact.payout.reference}`}
+              subtitle={`${countryName(contact.country, language)} · ${
+                contact.payout.kind === "local"
+                  ? localPayoutLabel(contact.country)
+                  : t(`contacts.payout.${contact.payout.kind}` as "contacts.payout.ruma" | "contacts.payout.cash")
+              } ·· ${payoutReferenceDisplay(contact, language)}`}
               chevron
               onClick={() => choose(contact)}
             />
