@@ -20,10 +20,22 @@ import { useConverted, useMoney } from "@/lib/money/money-context";
 import { useUsdcBalance } from "@/hooks/use-usdc-balance";
 import { fromDecimalString, fromMinor } from "@/lib/money/money";
 import { useCard } from "@/lib/card/card-context";
+import { FLAGS } from "@/lib/flags";
+import { CardUnavailable } from "@/components/card/card-unavailable";
 import { SETUP_STEPS, canSpend, formatExpiry, nextSetupStep } from "@/lib/card/card";
 import type { CardSecrets } from "@/lib/card/card-provider";
 
+/**
+ * Split from `CardContent` so the flag is read before any card hook runs — an
+ * early return inside the content component would sit after `useCard`, which
+ * would still consult the provider for a flow the user cannot reach.
+ */
 export default function CardScreen() {
+  if (!FLAGS.card) return <CardUnavailable />;
+  return <CardContent />;
+}
+
+function CardContent() {
   const { t } = useI18n();
   const { setup } = useCard();
 

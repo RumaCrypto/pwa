@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Flags } from "@/lib/flags";
 import {
   formatLocalPayoutReference,
   localPayoutFieldLabel,
@@ -12,8 +13,10 @@ import {
   type Contact,
 } from "./contacts";
 
-const on = { cashPoints: true };
-const off = { cashPoints: false };
+// Typed so a new flag has to be accounted for here rather than defaulting
+// silently; these suites only vary cashPoints.
+const on: Flags = { cashPoints: true, card: false };
+const off: Flags = { cashPoints: false, card: false };
 
 describe("payoutKindsFor", () => {
   it("hides cash payout while no Ruma points exist", () => {

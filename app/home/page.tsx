@@ -27,6 +27,7 @@ import { AddContactSheet } from "@/components/contacts/add-contact-sheet";
 import { useActivity, type ActivityEntry } from "@/lib/activity/activity";
 import { useLimits } from "@/lib/limits/limits-context";
 import { MAX_LEVEL } from "@/lib/limits/limits";
+import { FLAGS } from "@/lib/flags";
 import { formatDayAndTime } from "@/lib/datetime";
 import { truncateAddress } from "@/lib/format";
 
@@ -120,9 +121,15 @@ export default function HomePage() {
               </small>
             </p>
           </StatusCard>,
-          <button key="card" onClick={() => router.push("/card")} className="block w-full text-left">
-            <PaymentCard last4="4417" kind={t("home.card.debit")} className="min-h-44" />
-          </button>,
+          // Until an issuer is connected the card face stays in the carousel as a
+          // promise, but with nothing to tap and no number to show.
+          FLAGS.card ? (
+            <button key="card" onClick={() => router.push("/card")} className="block w-full text-left">
+              <PaymentCard last4="4417" kind={t("home.card.debit")} className="min-h-50.25" />
+            </button>
+          ) : (
+            <PaymentCard key="card" kind={t("home.card.debit")} note={t("card.soon")} className="min-h-50.25" />
+          ),
         ]}
       </Carousel>
 

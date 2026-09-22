@@ -10,6 +10,7 @@ import {
   withdrawTotal,
 } from "./methods";
 import { fromNumber } from "@/lib/money/money";
+import type { Flags } from "@/lib/flags";
 
 describe("method catalogues", () => {
   it("offers the three ways in the order the designs show them", () => {
@@ -27,8 +28,10 @@ describe("method catalogues", () => {
   });
 });
 
-const on = { cashPoints: true };
-const off = { cashPoints: false };
+// Typed so a new flag has to be accounted for here rather than defaulting
+// silently; these suites only vary cashPoints.
+const on: Flags = { cashPoints: true, card: false };
+const off: Flags = { cashPoints: false, card: false };
 
 describe("enabledMethods", () => {
   it("hides cash while no Ruma points exist", () => {
