@@ -125,10 +125,10 @@ export default function HomePage() {
           // promise, but with nothing to tap and no number to show.
           FLAGS.card ? (
             <button key="card" onClick={() => router.push("/card")} className="block w-full text-left">
-              <PaymentCard last4="4417" kind={t("home.card.debit")} className="min-h-44" />
+              <PaymentCard last4="4417" kind={t("home.card.debit")} className="min-h-50.25" />
             </button>
           ) : (
-            <PaymentCard key="card" kind={t("home.card.debit")} note={t("card.soon")} className="min-h-44" />
+            <PaymentCard key="card" kind={t("home.card.debit")} note={t("card.soon")} className="min-h-50.25" />
           ),
         ]}
       </Carousel>
