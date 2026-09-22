@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Mail, Fingerprint } from "lucide-react";
 import { OTPInput, SlotProps } from "input-otp";
 import clsx from "clsx";
-import { usePrivy, useLoginWithEmail, useLoginWithPasskey, useCreateWallet } from "@privy-io/react-auth";
+import { usePrivy, useLoginWithEmail, useLoginWithPasskey, useSignupWithPasskey, useCreateWallet } from "@privy-io/react-auth";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,27 +13,54 @@ import { typography } from "@/constants/typography";
 
 type Step = "method" | "email" | "code";
 
+const PASSKEY_ACCOUNT_EXISTS_KEY = 'privy_passkey_account_exists';
+
 export default function LoginMethodStep() {
   const { t } = useI18n();
   const router = useRouter();
   const { user, authenticated } = usePrivy();
   const { sendCode, loginWithCode, state: emailState } = useLoginWithEmail();
   const { loginWithPasskey, state: passkeyState } = useLoginWithPasskey();
+  const { signupWithPasskey, state: signupPasskeyState } = useSignupWithPasskey();
   const { createWallet } = useCreateWallet();
 
   const [step, setStep] = useState<Step>("method");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [hasPasskeyAccount, setHasPasskeyAccount] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (authenticated) router.replace("/home");
   }, [authenticated, router]);
 
+  useEffect(() => {
+    const loadPasskeyStatus = () => {
+      try {
+        const exists = localStorage.getItem(PASSKEY_ACCOUNT_EXISTS_KEY);
+        setHasPasskeyAccount(exists === 'true');
+      } catch (error) {
+        console.error('Failed to load passkey status:', error);
+        setHasPasskeyAccount(false);
+      }
+    };
+    loadPasskeyStatus();
+  }, []);
+
   const handlePasskey = async () => {
     setError(null);
     try {
-      await loginWithPasskey();
+      if (hasPasskeyAccount) {
+        // User has existing passkey, login
+        await loginWithPasskey();
+      } else {
+        // First time, signup
+        await signupWithPasskey();
+        // Mark that passkey account now exists
+        localStorage.setItem(PASSKEY_ACCOUNT_EXISTS_KEY, 'true');
+        setHasPasskeyAccount(true);
+      }
+      
       let wallet = user?.wallet;
       if (!wallet) {
         wallet = await createWallet();
@@ -72,6 +99,11 @@ export default function LoginMethodStep() {
     passkeyState.status === "generating-challenge" ||
     passkeyState.status === "awaiting-passkey" ||
     passkeyState.status === "submitting-response";
+
+  const signupPasskeyBusy =
+    signupPasskeyState.status === "generating-challenge" ||
+    signupPasskeyState.status === "awaiting-passkey" ||
+    signupPasskeyState.status === "submitting-response";
 
   return (
     <div className="flex flex-1 flex-col justify-between px-6 pb-8 pt-16">
@@ -151,7 +183,11 @@ export default function LoginMethodStep() {
               <Mail size={20} />
               {t("onboarding.loginMethod.emailButton")}
             </Button>
-            <Button variant="secondary" onClick={handlePasskey} disabled={passkeyBusy}>
+            <Button 
+              variant="secondary" 
+              onClick={handlePasskey} 
+              disabled={hasPasskeyAccount === null || passkeyBusy || signupPasskeyBusy}
+            >
               <Fingerprint size={20} />
               {t("onboarding.loginMethod.passkeyButton")}
             </Button>
