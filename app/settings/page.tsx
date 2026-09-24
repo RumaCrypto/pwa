@@ -7,6 +7,8 @@ import { LANGUAGES, type Language } from "@/lib/i18n/languages";
 import { useMoney } from "@/lib/money/money-context";
 import { CURRENCIES, CURRENCY_CODES } from "@/lib/money/currencies";
 import { fromNumber } from "@/lib/money/money";
+import { COUNTRIES, countryName } from "@/lib/contacts/contacts";
+import { useResidency } from "@/lib/settings/residency-context";
 import { Screen } from "@/components/ui/screen";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
@@ -16,6 +18,7 @@ import { typography } from "@/constants/typography";
 export default function SettingsPage() {
   const { t, language, setLanguage } = useI18n();
   const { displayCurrency, setDisplayCurrency, format } = useMoney();
+  const { country: residencyCountry, setCountry: setResidencyCountry } = useResidency();
   const { logout } = usePrivy();
   const router = useRouter();
 
@@ -34,6 +37,19 @@ export default function SettingsPage() {
               title={t(`settings.language.${lang}` as `settings.language.${Language}`)}
               selected={lang === language}
               onClick={() => setLanguage(lang)}
+            />
+          ))}
+        </Card>
+      </Section>
+
+      <Section title={t("settings.selectCountry")} hint={t("settings.countryHint")}>
+        <Card divided>
+          {COUNTRIES.map((code) => (
+            <ListRow
+              key={code}
+              title={countryName(code, language)}
+              selected={code === residencyCountry}
+              onClick={() => setResidencyCountry(code)}
             />
           ))}
         </Card>

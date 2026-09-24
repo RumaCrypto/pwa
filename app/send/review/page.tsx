@@ -87,7 +87,7 @@ export default function SendReviewStep() {
             </p>
           )}
           <p style={typography.body5} className="mt-3 text-center text-text-secondary">
-            {t("sendFlow.step3.legal")}
+            {t("sendFlow.step3.legal")} {" "} <a href="https://www.p2p.lol/tnc" target="_blank" className="font-bold">{t("common.terms")}</a>
           </p>
         </>
       }
