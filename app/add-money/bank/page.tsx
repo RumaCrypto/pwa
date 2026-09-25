@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePrivy } from "@privy-io/react-auth";
+import clsx from "clsx";
 
 import { Screen } from "@/components/ui/screen";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Keypad } from "@/components/ui/keypad";
 import { typography } from "@/constants/typography";
 
@@ -19,6 +22,8 @@ import { p2pBuyRateProvider, p2pBuyCountryOverrideRate } from "@/lib/money/p2p-p
 import { convert } from "@/lib/money/money";
 import { appendDecimal, appendDigit, backspace, formatDraft, toMoney } from "@/lib/money/amount-input";
 import { useResidency } from "@/lib/settings/residency-context";
+import { sdkCurrencyForCountry } from "@/lib/contacts/contacts";
+import { useBuyLimit } from "@/hooks/use-buy-limit";
 
 export default function AddMoneyBankAmountStep() {
   const router = useRouter();
@@ -26,6 +31,7 @@ export default function AddMoneyBankAmountStep() {
   const { format } = useMoney();
   const { setQuote } = useDeposit();
   const { country, loaded } = useResidency();
+  const { user } = usePrivy();
 
   const [draft, setDraft] = useState("");
 
@@ -36,6 +42,10 @@ export default function AddMoneyBankAmountStep() {
     country ?? undefined,
     p2pBuyRateProvider,
     p2pBuyCountryOverrideRate
+  );
+  const { limit, loading: limitLoading } = useBuyLimit(
+    user?.wallet?.address,
+    country ? sdkCurrencyForCountry(country) : undefined
   );
 
   if (!loaded) return null;
@@ -60,7 +70,9 @@ export default function AddMoneyBankAmountStep() {
 
   const local = toMoney(draft, currency);
   const usdc = local.amount > 0n && rate !== null ? convert(local, 1 / rate, "USD") : null;
-  const ready = local.amount > 0n && rate !== null;
+  // The limit is only known once read; if the read fails, the contract stays the final word.
+  const overLimit = usdc !== null && limit !== null && usdc.amount > limit.amount;
+  const ready = local.amount > 0n && rate !== null && !limitLoading && !overLimit;
 
   const separator =
     new Intl.NumberFormat(LOCALES[language]).formatToParts(1.1).find((p) => p.type === "decimal")?.value ??
@@ -103,6 +115,24 @@ export default function AddMoneyBankAmountStep() {
           {loading ? t("sendFlow.step2.rateLoading") : error ? t("sendFlow.step2.rateError") : usdc ? format(usdc) : "—"}
         </p>
       </Card>
+
+      <button onClick={() => router.push("/limits")} className="mt-3 block w-full text-left">
+        <Card className="flex items-center gap-3 px-4 py-4">
+          <div className="min-w-0 flex-1">
+            <p style={typography.heading4}>
+              {limitLoading
+                ? t("common.loading")
+                : limit
+                  ? t("depositFlow.amount.limit.title", { amount: format(limit) })
+                  : t("depositFlow.amount.limit.unknown")}
+            </p>
+            <p style={typography.body4} className={clsx("mt-0.5", overLimit ? "text-danger" : "text-text-secondary")}>
+              {overLimit ? t("depositFlow.amount.limit.exceeded") : t("depositFlow.amount.limit.subtitle")}
+            </p>
+          </div>
+          <Badge variant="dark">{t("home.limit.action")}</Badge>
+        </Card>
+      </button>
 
       <div className="mt-3">
         <Keypad
