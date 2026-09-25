@@ -54,10 +54,9 @@ describe("enabledMethods", () => {
 });
 
 describe("isAvailable", () => {
-  it("only the wallet route works without an external provider", () => {
-    // Bank and cash both need p2p.me or a Ruma point behind them.
+  it("bank and wallet work; cash still needs a Ruma point", () => {
     expect(isAvailable("wallet")).toBe(true);
-    expect(isAvailable("bank")).toBe(false);
+    expect(isAvailable("bank")).toBe(true);
     expect(isAvailable("cash")).toBe(false);
   });
 });

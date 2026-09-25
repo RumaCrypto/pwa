@@ -52,13 +52,17 @@ export const defaultRateProvider: RateProvider = routeByCoverage(
  * `country`, when given, is checked against p2p.me's country-level overrides
  * before `from`/`to` ever reach `provider` — currency codes alone can't tell
  * an Ecuador payout from a US-dollar balance, both "USD", but p2p.me prices
- * them differently. See `p2pCountryOverrideRate`.
+ * them differently. See `p2pCountryOverrideRate`. `countryOverride` defaults
+ * to the sell-side override so every existing caller is unaffected; a caller
+ * quoting the buy side (add money) passes `p2pBuyCountryOverrideRate` instead
+ * so an Ecuador quote doesn't pick up the withdraw-side rate.
  */
 export function useRate(
   from: CurrencyCode,
   to: CurrencyCode,
   country?: string,
-  provider: RateProvider = defaultRateProvider
+  provider: RateProvider = defaultRateProvider,
+  countryOverride: (country: string) => Promise<number | null> = p2pCountryOverrideRate
 ): RateState {
   const [state, setState] = useState<RateState>({ rate: null, loading: true, error: null });
 
@@ -68,7 +72,7 @@ export function useRate(
 
     const fetchRate = async () => {
       if (country && from === "USD" && to === "USD") {
-        const override = await p2pCountryOverrideRate(country);
+        const override = await countryOverride(country);
         if (override !== null) return override;
       }
       return provider.getRate(from, to);
@@ -82,7 +86,7 @@ export function useRate(
     return () => {
       active = false;
     };
-  }, [from, to, country, provider]);
+  }, [from, to, country, provider, countryOverride]);
 
   return state;
 }
