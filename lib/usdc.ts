@@ -11,3 +11,16 @@ export const erc20BalanceOfAbi = [
     outputs: [{ name: "", type: "uint256" }],
   },
 ] as const;
+
+export const erc20TransferAbi = [
+  {
+    type: "function",
+    name: "transfer",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+] as const;

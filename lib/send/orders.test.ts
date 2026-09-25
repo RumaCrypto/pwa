@@ -6,6 +6,7 @@ import { fromNumber } from "@/lib/money/money";
 const START = new Date("2026-09-12T12:00:00Z");
 
 const base: Order = {
+  kind: "p2p",
   id: "RM-000001",
   contactId: "rosa",
   quote: buildQuote(fromNumber(200, "USD"), 5.4, "BRL", START),

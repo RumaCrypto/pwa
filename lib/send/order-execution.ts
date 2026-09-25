@@ -1,7 +1,9 @@
 import type { ExecuteBase, OrdersClient } from "@p2pdotme/sdk/orders";
 import type { CurrencyCode as SdkCurrencyCode } from "@p2pdotme/sdk/country";
-import type { Address, WalletClient } from "viem";
+import { isAddress, type Address, type WalletClient } from "viem";
+import { base } from "viem/chains";
 
+import { USDC_ADDRESS_BASE, erc20TransferAbi } from "@/lib/usdc";
 import { p2pProfile } from "./p2p-profile";
 
 /** Numeric order-type codes the diamond contract expects. Sell is the only one this app places. */
@@ -115,4 +117,60 @@ export async function submitPayoutAddress({
     waitForReceipt: true,
   });
   if (setUpiResult.isErr()) throw setUpiResult.error;
+}
+
+export interface SendUsdcTransferParams {
+  walletClient: WalletClient;
+  userAddress: Address;
+  /** The "Has Ruma" contact's own wallet — their `Payout.reference`. */
+  to: Address;
+  /** 6-decimal bigint — the USDC actually sent. */
+  usdcAmount: bigint;
+}
+
+/**
+ * Submits a USDC transfer straight to a Ruma contact's wallet on Base and
+ * returns its hash as soon as the network has accepted it — without waiting
+ * for a block. Both sides already hold USDC, so unlike `placeSellOrder`
+ * there's no fiat leg and no merchant; confirmation is `confirmUsdcTransfer`.
+ */
+export async function sendUsdcTransfer({
+  walletClient,
+  userAddress,
+  to,
+  usdcAmount,
+}: SendUsdcTransferParams): Promise<`0x${string}`> {
+  if (!isAddress(to)) throw new Error("This contact's Ruma address looks invalid.");
+
+  return walletClient.writeContract({
+    address: USDC_ADDRESS_BASE,
+    abi: erc20TransferAbi,
+    functionName: "transfer",
+    args: [to, usdcAmount],
+    account: userAddress,
+    chain: base,
+  });
+}
+
+/** The slice of a transaction receipt `confirmUsdcTransfer` reads. */
+interface TransferReceipt {
+  status: "success" | "reverted";
+  gasUsed: bigint;
+  effectiveGasPrice: bigint;
+}
+
+/**
+ * Waits for a submitted transfer to be mined. `waitForReceipt` is normally
+ * `baseClient.waitForTransactionReceipt`, taken as a bare function rather than
+ * a `PublicClient` — pnpm resolves more than one copy of viem across the
+ * workspace (see `toSdkWalletClient` above for the same issue with
+ * `WalletClient`). Resolves to the fee paid in wei; throws if it reverted.
+ */
+export async function confirmUsdcTransfer(
+  hash: `0x${string}`,
+  waitForReceipt: (params: { hash: `0x${string}` }) => Promise<TransferReceipt>
+): Promise<{ feeWei: bigint }> {
+  const receipt = await waitForReceipt({ hash });
+  if (receipt.status !== "success") throw new Error("The transfer was rejected by the network.");
+  return { feeWei: receipt.gasUsed * receipt.effectiveGasPrice };
 }

@@ -21,14 +21,11 @@ export type OrderFailureReason = "cancelled" | "timeout" | "error";
  */
 export type OrderPhase = "awaiting_merchant" | "awaiting_completion" | "completed" | "failed";
 
-export interface Order {
+interface BaseOrder {
   id: string;
   contactId: string;
   quote: Quote;
   createdAt: Date;
-
-  /** The on-chain order id, from the `OrderPlaced` event in the placement receipt. */
-  p2pOrderId: bigint;
   placeTxHash: `0x${string}`;
   phase: OrderPhase;
   failureReason?: OrderFailureReason;
@@ -40,6 +37,40 @@ export interface Order {
   actualFiatAmount?: bigint;
   completedAt?: Date;
 }
+
+/** Placed as a p2p.me sell order — settles through a merchant, in the contact's local currency. */
+export interface P2pOrder extends BaseOrder {
+  kind: "p2p";
+  /** The on-chain order id, from the `OrderPlaced` event in the placement receipt. */
+  p2pOrderId: bigint;
+}
+
+/**
+ * A plain USDC transfer to a "Has Ruma" contact's own wallet on Base. Created
+ * `awaiting_completion` the moment the transaction is submitted, and completed
+ * once its receipt confirms — no merchant, so only two steps (`RUMA_STAGES`).
+ */
+export interface RumaTransferOrder extends BaseOrder {
+  kind: "ruma";
+  /** Gas paid, in wei, read from the receipt once confirmed. */
+  networkFeeWei?: bigint;
+}
+
+export const RUMA_STAGES = ["submitted", "confirmed"] as const;
+export type RumaStage = (typeof RUMA_STAGES)[number];
+
+/** "submitted" is always done — the order only exists once the transaction is on the network. */
+export function rumaStageState(stage: RumaStage, order: RumaTransferOrder): TimelineStepState {
+  if (stage === "submitted") return "done";
+  if (order.phase === "completed") return "done";
+  return order.phase === "failed" ? "pending" : "current";
+}
+
+export function rumaProgressFor(order: RumaTransferOrder): number {
+  return order.phase === "completed" ? 1 : 0.5;
+}
+
+export type Order = P2pOrder | RumaTransferOrder;
 
 export function stageIndex(stage: Stage): number {
   return STAGES.indexOf(stage);

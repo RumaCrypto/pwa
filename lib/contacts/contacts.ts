@@ -1,3 +1,4 @@
+import { isAddress } from "viem";
 import {
   COUNTRY_OPTIONS,
   PAYMENT_ID_FIELDS,
@@ -136,7 +137,15 @@ const LOCAL_PAYOUT_FIELD_OVERRIDES: Record<string, Record<string, LocalPayoutFie
 
 export type PayoutKind = "ruma" | "cash" | "local";
 
-/** How a contact receives money. `reference` is the Pix key, phone, or username. */
+/**
+ * A "Has Ruma" contact's reference must be their own wallet address — money
+ * moves to it as a plain USDC transfer on Base, not a p2p.me sell order.
+ */
+export function isValidRumaAddress(reference: string): boolean {
+  return isAddress(reference.trim());
+}
+
+/** How a contact receives money. `reference` is the Pix key, phone, or (for "ruma") their wallet address. */
 export interface Payout {
   kind: PayoutKind;
   reference: string;

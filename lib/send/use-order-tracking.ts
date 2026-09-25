@@ -4,9 +4,11 @@ import { useEffect, useRef } from "react";
 
 import type { Contact } from "@/lib/contacts/contacts";
 import { useP2pWalletClient } from "@/hooks/use-p2p-wallet-client";
+import { baseClient } from "@/lib/viem";
 import { getP2pOrders } from "./p2p-orders";
-import { submitPayoutAddress } from "./order-execution";
+import { confirmUsdcTransfer, submitPayoutAddress } from "./order-execution";
 import { isTerminal, type Order } from "./orders";
+import type { OrderPatch } from "./send-context";
 
 const POLL_MS = 4000;
 /** No merchant matched the order in time. */
@@ -22,13 +24,41 @@ const COMPLETION_TIMEOUT_MS = 30 * 60_000;
 export function useOrderTracking(
   order: Order | null | undefined,
   contact: Contact | undefined,
-  updateOrder: (id: string, patch: Partial<Order>) => Order | undefined
+  updateOrder: (id: string, patch: OrderPatch) => Order | undefined
 ): void {
   const getWalletClient = useP2pWalletClient();
   const payoutSubmitting = useRef(false);
 
+  // A Ruma transfer is already on the network when its order exists; all
+  // that's left is waiting for the receipt. Safe after a reload too, since
+  // the hash is persisted with the order.
   useEffect(() => {
-    if (!order || !contact || isTerminal(order)) return;
+    if (!order || order.kind !== "ruma" || isTerminal(order)) return;
+
+    const { id, placeTxHash } = order;
+    let stopped = false;
+
+    confirmUsdcTransfer(placeTxHash, baseClient.waitForTransactionReceipt)
+      .then(({ feeWei }) => {
+        if (!stopped) updateOrder(id, { phase: "completed", completedAt: new Date(), networkFeeWei: feeWei });
+      })
+      .catch((err) => {
+        if (stopped) return;
+        updateOrder(id, {
+          phase: "failed",
+          failureReason: "error",
+          errorMessage: err instanceof Error ? err.message : "The transfer could not be confirmed.",
+        });
+      });
+
+    return () => {
+      stopped = true;
+    };
+  }, [order, updateOrder]);
+
+  useEffect(() => {
+    // Only p2p.me sell orders are polled; Ruma transfers are handled above.
+    if (!order || !contact || isTerminal(order) || order.kind !== "p2p") return;
 
     const currentOrder = order;
     const currentContact = contact;
