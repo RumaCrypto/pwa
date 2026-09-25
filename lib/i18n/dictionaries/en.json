@@ -496,7 +496,7 @@
   "payFlow.done.receiptNote": "The receipt is recorded and nobody can alter it, not even Ruma.",
   "payFlow.done.button": "Done",
   "depositFlow.amount.title": "Add money by bank transfer",
-  "depositFlow.amount.hint": "Enter how much USDC you want to add. You'll pay in your local currency once we find a seller.",
+  "depositFlow.amount.hint": "Enter how much digital dollars (USDC) you want to add. You'll pay in your local currency once we find a seller.",
   "depositFlow.amount.needsCountry": "Set your country of residence in Settings first — it decides which currency you'll pay in.",
   "depositFlow.amount.setCountry": "Go to Settings",
   "depositFlow.amount.sending": "You are paying",
