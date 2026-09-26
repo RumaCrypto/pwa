@@ -1,222 +1,220 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import clsx from "clsx";
-import { Check } from "lucide-react";
+import { AtSign, Check, Fingerprint, IdCard, Landmark, ScanFace, ShieldCheck, type LucideIcon } from "lucide-react";
+import type { Address } from "viem";
 
 import { Screen } from "@/components/ui/screen";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Callout } from "@/components/ui/callout";
-import { Button } from "@/components/ui/button";
-import { Sheet } from "@/components/ui/sheet";
 import { ListRow } from "@/components/ui/list-row";
 import { DetailRow } from "@/components/ui/detail-row";
-import { ProgressBar } from "@/components/ui/progress-bar";
 import { typography } from "@/constants/typography";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { useMoney } from "@/lib/money/money-context";
-import { useLimits } from "@/lib/limits/limits-context";
+import { useResidency } from "@/lib/settings/residency-context";
+import { useTxLimits } from "@/hooks/use-tx-limits";
+import { useP2pWalletClient } from "@/hooks/use-p2p-wallet-client";
 import {
-  MAX_LEVEL,
-  SENDS_FOR_TOP_LEVEL,
-  SOCIAL_NETWORKS,
-  rewardFor,
-  type RaiseStep,
-  type SocialNetwork,
-} from "@/lib/limits/limits";
+  ENABLED_METHODS,
+  METHOD_COUNTRIES,
+  VERIFICATION_METHODS,
+  completeLiveness,
+  isLivenessConfigured,
+  readVerifiedMethods,
+  startLiveness,
+  type VerificationMethod,
+} from "@/lib/limits/reputation";
 
-const STEPS: RaiseStep[] = ["social", "document", "usage"];
+const METHOD_ICONS: Record<VerificationMethod, LucideIcon> = {
+  liveness: ScanFace,
+  document: IdCard,
+  zkPassport: ShieldCheck,
+  social: AtSign,
+  aadhaar: Fingerprint,
+  bvn: Landmark,
+};
+
+type LivenessPhase = "idle" | "starting" | "finishing";
 
 export default function LimitsScreen() {
+  const router = useRouter();
   const { t } = useI18n();
   const { format } = useMoney();
-  const { level, limits, verifications, connectSocial, verifyDocument } = useLimits();
+  const { user } = usePrivy();
+  const { ready: walletsReady } = useWallets();
+  const getWalletClient = useP2pWalletClient();
+  const { country, loaded } = useResidency();
+  const address = user?.wallet?.address as Address | undefined;
 
-  const [sheet, setSheet] = useState<"social" | "document" | null>(null);
+  const { limits, loading, refetch: refetchLimits } = useTxLimits(address, country);
+  const [verified, setVerified] = useState<Partial<Record<VerificationMethod, boolean>>>({});
+  const [phase, setPhase] = useState<LivenessPhase>("idle");
+  const [error, setError] = useState<string | null>(null);
 
-  const isDone = (step: RaiseStep) =>
-    step === "social"
-      ? verifications.socials.length > 0
-      : step === "document"
-        ? verifications.document
-        : verifications.completedSends >= SENDS_FOR_TOP_LEVEL;
+  const refetchVerified = useCallback(async () => {
+    if (!address) return;
+    try {
+      setVerified(await readVerifiedMethods(address));
+    } catch (err) {
+      console.error("Failed to read verifications", err);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    refetchVerified();
+  }, [refetchVerified]);
+
+  // The liveness wizard lands back here with `?code=&state=`. Guarded by a ref
+  // so a remount can't redeem the one-time code twice.
+  const finishing = useRef(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code || !address || !walletsReady || finishing.current) return;
+    finishing.current = true;
+
+    /* eslint-disable-next-line react-hooks/set-state-in-effect -- reflects the redirect just received. */
+    setPhase("finishing");
+    (async () => {
+      try {
+        const { walletClient } = await getWalletClient();
+        await completeLiveness({ code, state: params.get("state"), walletClient });
+        await Promise.all([refetchVerified(), refetchLimits()]);
+      } catch (err) {
+        console.error(err);
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setPhase("idle");
+        router.replace("/limits");
+      }
+    })();
+  }, [address, walletsReady, getWalletClient, refetchVerified, refetchLimits, router]);
+
+  const verifyLiveness = async () => {
+    if (!address) return;
+    setError(null);
+    setPhase("starting");
+    try {
+      await startLiveness(address, "/limits");
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : String(err));
+      setPhase("idle");
+    }
+  };
+
+  if (!loaded) return null;
+
+  const methods = VERIFICATION_METHODS.filter((method) => {
+    const only = METHOD_COUNTRIES[method];
+    return !only || only === country;
+  });
+  const canBuy = limits !== null && limits.buy.amount > 0n;
 
   return (
     <Screen title={t("limits.title")} backLabel={t("common.back")}>
-      <h2 style={typography.display3}>{t("limits.level", { level, total: MAX_LEVEL })}</h2>
-      <ProgressBar value={level / MAX_LEVEL} className="mt-4" />
+      {!country ? (
+        <p style={typography.body3} className="text-text-secondary">
+          {t("limits.needsCountry")}
+        </p>
+      ) : (
+        <>
+          <Card className="px-5 py-3">
+            <DetailRow
+              label={t("limits.buy")}
+              value={
+                loading && !limits
+                  ? t("common.loading")
+                  : limits
+                    ? canBuy
+                      ? format(limits.buy)
+                      : t("limits.locked")
+                    : "—"
+              }
+            />
+            <DetailRow
+              label={t("limits.sell")}
+              value={loading && !limits ? t("common.loading") : limits ? format(limits.sell) : "—"}
+            />
+          </Card>
+          <p style={typography.body4} className="mt-2 px-1 text-text-secondary">
+            {t("limits.perOrder")}
+          </p>
 
-      <Card className="mt-6 px-5 py-3">
-        <DetailRow label={t("limits.perSend")} value={format(limits.perSend)} />
-        <DetailRow label={t("limits.perDay")} value={format(limits.perDay)} />
-        <DetailRow label={t("limits.sendsPerDay")} value={limits.sendsPerDay} />
-      </Card>
-
-      {/* Only true before anything has been verified; past that it contradicts the screen. */}
-      {level === 1 && (
-        <Callout className="mt-5" title={t("limits.noteTitle")}>
-          {t("limits.noteBody")}
-        </Callout>
+          {limits && !canBuy && (
+            <Callout className="mt-5" title={t("limits.buyLockedTitle")}>
+              {t("limits.buyLockedBody")}
+            </Callout>
+          )}
+        </>
       )}
 
-      <h3 style={typography.heading3} className="mb-3 mt-8">
+      <h3 style={typography.heading3} className="mb-1 mt-8">
         {t("limits.raise")}
       </h3>
+      <p style={typography.body3} className="mb-3 text-text-secondary">
+        {t("limits.raiseHint")}
+      </p>
 
       <Card divided>
-        {STEPS.map((step, index) => {
-          const done = isDone(step);
-          const reward = rewardFor(step);
+        {methods.map((method) => {
+          const done = verified[method] === true;
+          const enabled = ENABLED_METHODS.has(method) && (method !== "liveness" || isLivenessConfigured());
+          const busy = method === "liveness" && phase !== "idle";
+          const Icon = METHOD_ICONS[method];
 
           return (
             <ListRow
-              key={step}
-              leading={<StepNumber index={index + 1} done={done} />}
-              title={t(`limits.step.${step}` as "limits.step.social")}
-              subtitle={
-                step === "usage" && !done
-                  ? t("limits.usageProgress", {
-                      done: verifications.completedSends,
-                      total: SENDS_FOR_TOP_LEVEL,
-                    })
-                  : t(`limits.step.${step}Hint` as "limits.step.socialHint")
-              }
+              key={method}
+              className={clsx(!enabled && !done && "opacity-50")}
+              leading={<MethodIcon icon={Icon} done={done} />}
+              title={t(`limits.method.${method}` as "limits.method.liveness")}
+              subtitle={t(`limits.method.${method}Hint` as "limits.method.livenessHint")}
               trailing={
-                <Badge variant={done ? "outline" : "light"}>
-                  {done
-                    ? t("limits.step.done")
-                    : reward
-                      ? format(reward)
-                      : t("limits.step.usageBadge")}
-                </Badge>
+                done ? (
+                  <Badge variant="outline">{t("limits.method.done")}</Badge>
+                ) : !enabled ? (
+                  <Badge variant="outline">{t("limits.method.soon")}</Badge>
+                ) : (
+                  <Badge variant="dark">
+                    {busy
+                      ? phase === "finishing"
+                        ? t("limits.method.finishing")
+                        : t("common.loading")
+                      : t("limits.method.verify")}
+                  </Badge>
+                )
               }
-              onClick={
-                done || step === "usage"
-                  ? undefined
-                  : () => setSheet(step === "social" ? "social" : "document")
-              }
+              onClick={enabled && !done && !busy && address ? verifyLiveness : undefined}
             />
           );
         })}
       </Card>
 
-      {level === MAX_LEVEL && (
-        <p style={typography.body3} className="mt-5 text-center text-text-secondary">
-          {t("limits.topLevel")}
+      {error && (
+        <p style={typography.body3} className="mt-4 text-danger">
+          {error}
         </p>
       )}
-
-      <SocialSheet
-        open={sheet === "social"}
-        onClose={() => setSheet(null)}
-        connected={verifications.socials}
-        onConnect={(network) => {
-          connectSocial(network);
-          setSheet(null);
-        }}
-      />
-
-      <DocumentSheet
-        open={sheet === "document"}
-        onClose={() => setSheet(null)}
-        onVerified={() => {
-          verifyDocument();
-          setSheet(null);
-        }}
-      />
     </Screen>
   );
 }
 
-function StepNumber({ index, done }: { index: number; done: boolean }) {
+function MethodIcon({ icon: Icon, done }: { icon: LucideIcon; done: boolean }) {
   return (
     <span
-      style={typography.label3}
       className={clsx(
         "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
         done ? "bg-primary text-white" : "bg-primary-light text-primary-dark"
       )}
     >
-      {done ? <Check size={16} /> : index}
+      {done ? <Check size={16} /> : <Icon size={16} />}
     </span>
-  );
-}
-
-function SocialSheet({
-  open,
-  onClose,
-  connected,
-  onConnect,
-}: {
-  open: boolean;
-  onClose: () => void;
-  connected: readonly string[];
-  onConnect: (network: SocialNetwork) => void;
-}) {
-  const { t } = useI18n();
-
-  return (
-    <Sheet open={open} onClose={onClose} title={t("limits.social.title")} closeLabel={t("common.cancel")}>
-      <p style={typography.body3} className="mb-4 text-text-secondary">
-        {t("limits.social.hint")}
-      </p>
-      <Card divided>
-        {SOCIAL_NETWORKS.map((network) => {
-          const already = connected.includes(network);
-          return (
-            <ListRow
-              key={network}
-              title={<span className="capitalize">{network}</span>}
-              trailing={already ? <Badge variant="outline">{t("limits.social.connected")}</Badge> : undefined}
-              chevron={!already}
-              onClick={already ? undefined : () => onConnect(network)}
-            />
-          );
-        })}
-      </Card>
-    </Sheet>
-  );
-}
-
-function DocumentSheet({
-  open,
-  onClose,
-  onVerified,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onVerified: () => void;
-}) {
-  const { t } = useI18n();
-  const [verifying, setVerifying] = useState(false);
-
-  // Stands in for the identity provider's flow; only this handler changes when
-  // a real one is wired up.
-  const start = () => {
-    setVerifying(true);
-    setTimeout(() => {
-      setVerifying(false);
-      onVerified();
-    }, 1800);
-  };
-
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title={t("limits.document.title")}
-      closeLabel={t("common.cancel")}
-      footer={
-        <Button onClick={start} disabled={verifying}>
-          {verifying ? t("limits.document.verifying") : t("limits.document.start")}
-        </Button>
-      }
-    >
-      <p style={typography.body3} className="text-text-secondary">
-        {t("limits.document.hint")}
-      </p>
-    </Sheet>
   );
 }

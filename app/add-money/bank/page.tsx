@@ -22,8 +22,7 @@ import { p2pBuyRateProvider, p2pBuyCountryOverrideRate } from "@/lib/money/p2p-p
 import { convert } from "@/lib/money/money";
 import { appendDecimal, appendDigit, backspace, formatDraft, toMoney } from "@/lib/money/amount-input";
 import { useResidency } from "@/lib/settings/residency-context";
-import { sdkCurrencyForCountry } from "@/lib/contacts/contacts";
-import { useBuyLimit } from "@/hooks/use-buy-limit";
+import { useTxLimits } from "@/hooks/use-tx-limits";
 
 export default function AddMoneyBankAmountStep() {
   const router = useRouter();
@@ -43,10 +42,8 @@ export default function AddMoneyBankAmountStep() {
     p2pBuyRateProvider,
     p2pBuyCountryOverrideRate
   );
-  const { limit, loading: limitLoading } = useBuyLimit(
-    user?.wallet?.address,
-    country ? sdkCurrencyForCountry(country) : undefined
-  );
+  const { limits: txLimits, loading: limitLoading } = useTxLimits(user?.wallet?.address, country);
+  const limit = txLimits?.buy ?? null;
 
   if (!loaded) return null;
 
