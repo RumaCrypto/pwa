@@ -70,12 +70,39 @@ export function SendMoneyIllustration(props: SVGProps<SVGSVGElement>) {
 
 /** Slide 2 — pay local QR codes in your country. */
 export function QrIllustration(props: SVGProps<SVGSVGElement>) {
-  const finder = (x: number, y: number) => (
-    <>
-      <rect x={x} y={y} width="16" height="16" rx="4" fill={NAVY} />
-      <rect x={x + 4} y={y + 4} width="8" height="8" rx="2" fill={WHITE} />
-    </>
-  );
+  // Build a 21x21 matrix (real QR "version 1" proportions): three finder
+  // patterns, a timing row/column and a dense, deterministic data fill so it
+  // reads like an actual scannable code rather than a few loose squares.
+  const N = 21;
+  const size = 60;
+  const qx = 110;
+  const qy = 110;
+  const m = size / N;
+  const finderZone = (x: number, y: number) =>
+    (x < 8 && y < 8) || (x >= N - 8 && y < 8) || (x < 8 && y >= N - 8);
+  const finderOn = (x: number, y: number) => {
+    for (const [bx, by] of [[0, 0], [N - 7, 0], [0, N - 7]]) {
+      if (x >= bx && x < bx + 7 && y >= by && y < by + 7) {
+        const lx = x - bx;
+        const ly = y - by;
+        const ring = lx === 0 || lx === 6 || ly === 0 || ly === 6;
+        const center = lx >= 2 && lx <= 4 && ly >= 2 && ly <= 4;
+        return ring || center;
+      }
+    }
+    return false;
+  };
+  const cells: Array<[number, number]> = [];
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      let on: boolean;
+      if (finderZone(x, y)) on = finderOn(x, y);
+      else if (x === 6 || y === 6) on = (x + y) % 2 === 0; // timing pattern
+      else on = (x * 17 + y * 31 + x * y * 7) % 13 < 6; // pseudo-random data
+      if (on) cells.push([x, y]);
+    }
+  }
+
   return (
     <svg {...svg} {...props}>
       <Disc />
@@ -83,31 +110,18 @@ export function QrIllustration(props: SVGProps<SVGSVGElement>) {
       {/* phone */}
       <rect x="94" y="60" width="92" height="160" rx="22" fill={NAVY} opacity="0.08" transform="translate(0 6)" />
       <rect x="94" y="60" width="92" height="160" rx="22" fill={BLUE} />
-      <rect x="106" y="76" width="68" height="128" rx="12" fill={WHITE} />
+      <rect x="104" y="74" width="72" height="132" rx="13" fill={WHITE} />
 
-      {/* QR code: three finders + data modules */}
-      <g>
-        {finder(116, 88)}
-        {finder(148, 88)}
-        {finder(116, 120)}
-      </g>
+      {/* QR matrix */}
       <g fill={NAVY}>
-        <rect x="150" y="120" width="7" height="7" rx="1.5" />
-        <rect x="150" y="134" width="14" height="14" rx="3" />
-        <rect x="136" y="106" width="7" height="7" rx="1.5" />
-        <rect x="116" y="146" width="7" height="7" rx="1.5" />
-        <rect x="130" y="146" width="7" height="7" rx="1.5" />
-        <rect x="150" y="158" width="7" height="7" rx="1.5" />
-        <rect x="136" y="164" width="7" height="7" rx="1.5" />
+        {cells.map(([x, y], i) => (
+          <rect key={i} x={qx + x * m} y={qy + y * m} width={m + 0.35} height={m + 0.35} rx="0.6" />
+        ))}
       </g>
 
-      {/* amber scan frame */}
-      <g stroke={ACCENT} strokeWidth="5" fill="none">
-        <path d="M110 100V92a4 4 0 0 1 4-4h8" />
-        <path d="M170 100V92a4 4 0 0 0-4-4h-8" />
-        <path d="M110 164v8a4 4 0 0 0 4 4h8" />
-        <path d="M170 164v8a4 4 0 0 1-4 4h-8" />
-      </g>
+      {/* amber scan line */}
+      <ellipse cx="140" cy="140" rx="34" ry="7" fill={ACCENT} opacity="0.25" />
+      <rect x="108" y="137.5" width="64" height="4" rx="2" fill={ACCENT} />
     </svg>
   );
 }
