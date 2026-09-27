@@ -7,9 +7,9 @@ import { LanguagePicker } from "@/components/ui/language-picker";
 import { RumaLogo } from "@/components/ui/ruma-logo";
 import { OnboardingCarousel, type OnboardingSlide } from "@/components/onboarding/onboarding-carousel";
 import {
-  WalletIllustration,
+  SendMoneyIllustration,
   QrIllustration,
-  ShieldIllustration,
+  WalletIllustration,
 } from "@/components/onboarding/illustrations";
 import { typography } from "@/constants/typography";
 
@@ -21,7 +21,7 @@ export default function OnboardingWelcome() {
 
   const slides: OnboardingSlide[] = [
     {
-      illustration: <WalletIllustration className="h-full w-full" />,
+      illustration: <SendMoneyIllustration className="h-full w-full" />,
       title: t("onboarding.welcome.slide1.title"),
       line: t("onboarding.welcome.slide1.line"),
     },
@@ -31,7 +31,7 @@ export default function OnboardingWelcome() {
       line: t("onboarding.welcome.slide2.line"),
     },
     {
-      illustration: <ShieldIllustration className="h-full w-full" />,
+      illustration: <WalletIllustration className="h-full w-full" />,
       title: t("onboarding.welcome.slide3.title"),
       line: t("onboarding.welcome.slide3.line"),
     },

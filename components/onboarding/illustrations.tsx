@@ -125,49 +125,57 @@ export function QrIllustration(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Slide 3 — your money protected with strong security. */
-export function ShieldIllustration(props: SVGProps<SVGSVGElement>) {
+/** Slide 1 — send money between Latin American countries. */
+export function SendMoneyIllustration(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...svg} {...props}>
       <defs>
-        <linearGradient id="sh-panel" x1="40" y1="44" x2="240" y2="236" gradientUnits="userSpaceOnUse">
+        <linearGradient id="sm-panel" x1="40" y1="44" x2="240" y2="236" gradientUnits="userSpaceOnUse">
           <stop stopColor="#eef3ff" />
           <stop offset="1" stopColor="#d4e2ff" />
         </linearGradient>
-        <linearGradient id="sh-shield" x1="88" y1="60" x2="192" y2="220" gradientUnits="userSpaceOnUse">
+        <linearGradient id="sm-globe" x1="84" y1="96" x2="196" y2="208" gradientUnits="userSpaceOnUse">
           <stop stopColor="#3a72ff" />
           <stop offset="1" stopColor="#0034bd" />
         </linearGradient>
+        <linearGradient id="sm-coin" x1="128" y1="66" x2="152" y2="90" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#ecff6b" />
+          <stop offset="1" stopColor="#b6e000" />
+        </linearGradient>
       </defs>
 
-      <rect x="40" y="44" width="200" height="192" rx="52" fill="url(#sh-panel)" />
-      <circle cx="140" cy="132" r="72" fill="#ffffff" opacity="0.4" />
+      <rect x="40" y="44" width="200" height="192" rx="52" fill="url(#sm-panel)" />
 
-      <path
-        d="M140 58l58 22v46c0 40-26 66-58 80-32-14-58-40-58-80V80l58-22z"
-        fill="#0a1f5c"
-        opacity="0.12"
-        transform="translate(0 6)"
-      />
-      <path
-        d="M140 58l58 22v46c0 40-26 66-58 80-32-14-58-40-58-80V80l58-22z"
-        fill="url(#sh-shield)"
-      />
-      {/* glossy highlight */}
-      <path d="M140 58l58 22v46c0 40-26 66-58 80V58z" fill="#ffffff" opacity="0.08" />
-
-      {/* fingerprint */}
-      <g stroke="#ffffff" strokeWidth="4" fill="none">
-        <path d="M118 130a22 22 0 0 1 44 0v14" opacity="0.55" />
-        <path d="M130 132a10 10 0 0 1 20 0v18" opacity="0.75" />
-        <path d="M140 132v22" />
-        <path d="M118 150c0 12 3 22 8 30" opacity="0.5" />
-        <path d="M162 150c0 12-3 22-8 30" opacity="0.5" />
+      {/* globe */}
+      <circle cx="140" cy="154" r="58" fill="#0a1f5c" opacity="0.1" transform="translate(0 5)" />
+      <circle cx="140" cy="154" r="58" fill="url(#sm-globe)" />
+      <g stroke="#ffffff" fill="none" strokeWidth="3">
+        <ellipse cx="140" cy="154" rx="22" ry="58" opacity="0.35" />
+        <ellipse cx="140" cy="154" rx="44" ry="58" opacity="0.2" />
+        <line x1="82" y1="154" x2="198" y2="154" opacity="0.35" />
+        <ellipse cx="140" cy="154" rx="58" ry="24" opacity="0.22" />
+      </g>
+      {/* landmass hints */}
+      <g fill="#ffffff" opacity="0.85">
+        <path d="M112 128c8-4 20-2 22 4s-6 12-14 12-16-12-8-16z" />
+        <path d="M150 150c10 0 18 8 14 16s-18 6-22-2 0-14 8-14z" />
       </g>
 
-      {/* sparks */}
-      <circle cx="200" cy="86" r="5" fill="#DFFF00" />
-      <circle cx="82" cy="150" r="4" fill="#DFFF00" opacity="0.8" />
+      {/* transfer arc + coin */}
+      <path d="M96 116Q140 62 184 116" stroke="#DFFF00" strokeWidth="5" strokeDasharray="2 11" fill="none" />
+      <path d="M176 108l10 10-14 4z" fill="#DFFF00" />
+
+      {/* origin & destination pins */}
+      <g>
+        <path d="M96 132c-9-9-9-19 0-27 9 8 9 18 0 27z" fill="#ffffff" />
+        <circle cx="96" cy="111" r="5" fill="#0034bd" />
+      </g>
+
+      {/* flying coin */}
+      <ellipse cx="140" cy="86" rx="18" ry="6" fill="#0a1f5c" opacity="0.1" />
+      <circle cx="140" cy="72" r="16" fill="url(#sm-coin)" />
+      <circle cx="140" cy="72" r="16" stroke="#a9d400" strokeWidth="2" />
+      <circle cx="140" cy="72" r="8" stroke="#6a8500" strokeWidth="2.5" opacity="0.55" />
     </svg>
   );
 }
