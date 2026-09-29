@@ -18,7 +18,6 @@ import { useMoney } from "@/lib/money/money-context";
 import { fromNumber } from "@/lib/money/money";
 import { STAGES } from "@/lib/send/orders";
 import { FEE_RATE } from "@/lib/send/quote";
-import { PAY_FEE_RATE } from "@/lib/pay/payments";
 import { WITHDRAW_FEE } from "@/lib/cashflow/methods";
 
 const TOPICS = [
@@ -149,7 +148,7 @@ function Costs() {
     <Section title={t("help.costs.title")}>
       <Card className="px-5 py-3">
         <DetailRow label={t("help.costs.send")} value={percent(FEE_RATE)} />
-        <DetailRow label={t("help.costs.pay")} value={percent(PAY_FEE_RATE)} />
+        <DetailRow label={t("help.costs.pay")} value={percent(FEE_RATE)} />
         <DetailRow label={t("help.costs.withdraw")} value={format(WITHDRAW_FEE)} />
         <DetailRow label={t("help.costs.receive")} value={t("help.costs.free")} />
       </Card>

@@ -1,12 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Prices } from "@p2pdotme/sdk/prices";
-import { clearP2pRateCache, createP2pCountryOverride, p2pSupports, sellPriceToRate } from "./p2p-prices";
+import {
+  clearP2pRateCache,
+  createP2pBuyCountryOverride,
+  createP2pCountryOverride,
+  p2pSupports,
+  sellPriceToRate,
+} from "./p2p-prices";
 
 /** Stands in for the SDK's `Prices.getPriceConfig`, which resolves an `ok`/`err` Result. */
-function stubPrices(sellPrice: bigint): Prices {
+function stubPrices(sellPrice: bigint, buyPrice: bigint = sellPrice): Prices {
   const getPriceConfig = vi.fn(async () => ({
     isErr: () => false,
-    value: { sellPrice, buyPrice: sellPrice, buyPriceOffset: 0n, baseSpread: 0n },
+    value: { sellPrice, buyPrice, buyPriceOffset: 0n, baseSpread: 0n },
   }));
   return { getPriceConfig } as unknown as Prices;
 }
@@ -54,5 +60,23 @@ describe("createP2pCountryOverride", () => {
 
     expect(await override("US")).toBeNull();
     expect(await override("CO")).toBeNull();
+  });
+});
+
+describe("createP2pBuyCountryOverride", () => {
+  it("quotes Ecuador's buy price, distinct from its sell price", async () => {
+    clearP2pRateCache();
+    const prices = stubPrices(980_000n, 990_000n);
+    const override = createP2pBuyCountryOverride(prices);
+
+    expect(await override("EC")).toBe(0.99);
+  });
+
+  it("returns null for a country p2p.me has no USD-ambiguous override for", async () => {
+    clearP2pRateCache();
+    const prices = stubPrices(980_000n, 990_000n);
+    const override = createP2pBuyCountryOverride(prices);
+
+    expect(await override("US")).toBeNull();
   });
 });

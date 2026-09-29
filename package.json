@@ -15,7 +15,9 @@
   "dependencies": {
     "@p2pdotme/sdk": "^1.2.25",
     "@privy-io/react-auth": "^3.38.0",
+    "@reclaimprotocol/js-sdk": "^5.8.2",
     "@serwist/next": "latest",
+    "@zkpassport/sdk": "^0.17.1",
     "clsx": "^2.1.1",
     "input-otp": "^1.5.0",
     "jsqr": "^1.4.0",

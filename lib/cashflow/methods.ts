@@ -15,12 +15,12 @@ export function isAdvanced(method: CashflowMethod): boolean {
 }
 
 /**
- * Bank transfers route through p2p.me and cash through a Ruma point; neither is
- * connected yet. Moving stablecoins in or out of the wallet needs no provider,
- * so it is the one route that actually works today.
+ * Bank transfers route through p2p.me, the same protocol behind send and pay.
+ * Cash routes through a Ruma point, which does not exist yet. Moving
+ * stablecoins in or out of the wallet needs no provider either.
  */
 export function isAvailable(method: CashflowMethod): boolean {
-  return method === "wallet";
+  return method === "wallet" || method === "bank";
 }
 
 /** Drops routes whose flag is off, so nothing unreachable is ever offered. */
