@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePrivy } from "@privy-io/react-auth";
+import type { Address } from "viem";
 
 import { Screen } from "@/components/ui/screen";
 import { Card } from "@/components/ui/card";
@@ -16,7 +18,7 @@ import { useMoney } from "@/lib/money/money-context";
 import { useDeposit } from "@/lib/deposit/deposit-context";
 import { countryName, sdkCurrencyForCountry } from "@/lib/contacts/contacts";
 import { getP2pOrders } from "@/lib/send/p2p-orders";
-import { useLimits } from "@/lib/limits/limits-context";
+import { useTxLimits } from "@/hooks/use-tx-limits";
 import { useP2pWalletClient } from "@/hooks/use-p2p-wallet-client";
 import { USDC_DECIMALS } from "@/lib/usdc";
 
@@ -28,7 +30,9 @@ export default function AddMoneyBankReviewScreen() {
   const { t, language } = useI18n();
   const { quote, placeOrder, reset } = useDeposit();
   const { format } = useMoney();
-  const { limits, recordCompletedSend } = useLimits();
+  const { user } = usePrivy();
+  const address = user?.wallet?.address as Address | undefined;
+  const { limits } = useTxLimits(address, quote?.country);
   const getWalletClient = useP2pWalletClient();
 
   const [submitting, setSubmitting] = useState(false);
@@ -62,7 +66,8 @@ export default function AddMoneyBankReviewScreen() {
 
   if (!quote) return null;
 
-  const overLimit = quote.usdc.amount > limits.perSend.amount;
+  // The limit is only known once read; if the read fails, the contract stays the final word.
+  const overLimit = limits !== null && quote.usdc.amount > limits.buy.amount;
 
   const handleConfirm = async () => {
     setError(null);
@@ -70,7 +75,6 @@ export default function AddMoneyBankReviewScreen() {
     try {
       const { walletClient, address } = await getWalletClient();
       const order = await placeOrder({ quote, walletClient, userAddress: address });
-      recordCompletedSend();
       reset();
       router.replace(`/add-money/bank/${order.id}`);
     } catch (err) {
@@ -121,7 +125,7 @@ export default function AddMoneyBankReviewScreen() {
 
       {overLimit && (
         <p style={typography.body4} className="mt-3 text-danger">
-          {t("sendFlow.step2.overLimit", { limit: format(limits.perSend) })}
+          {t("depositFlow.amount.limit.exceeded")}
         </p>
       )}
 
