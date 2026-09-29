@@ -154,8 +154,6 @@ export interface Payout {
 export interface Contact {
   id: string;
   name: string;
-  /** What the home strip shows, and what the avatar initials derive from. */
-  shortName?: string;
   country: string;
   payout: Payout;
 }
@@ -271,8 +269,9 @@ export function sdkCurrencyForCountry(country: string): SdkCurrencyCode {
   return option.currency;
 }
 
+/** What the home strip shows, and what the avatar initials derive from. */
 export function displayName(contact: Contact): string {
-  return contact.shortName?.trim() || contact.name.split(" ")[0];
+  return contact.name.split(" ")[0];
 }
 
 export function countryName(country: string, language: Language): string {

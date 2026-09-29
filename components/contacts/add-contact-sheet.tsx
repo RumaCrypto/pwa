@@ -36,7 +36,6 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
   const { addContact } = useContacts();
 
   const [name, setName] = useState("");
-  const [shortName, setShortName] = useState("");
   const [country, setCountry] = useState(COUNTRIES[0]);
   const [kind, setKind] = useState<PayoutKind>(payoutKindsFor(COUNTRIES[0])[0]);
   const [reference, setReference] = useState("");
@@ -48,7 +47,6 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
 
   const reset = () => {
     setName("");
-    setShortName("");
     setCountry(COUNTRIES[0]);
     setKind(payoutKindsFor(COUNTRIES[0])[0]);
     setReference("");
@@ -84,7 +82,6 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
 
     const created = addContact({
       name: name.trim(),
-      shortName: shortName.trim() || undefined,
       country,
       payout: { kind, reference: payoutReference },
     });
@@ -112,14 +109,6 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
           onChange={(event) => setName(event.target.value)}
           placeholder={t("contacts.add.namePlaceholder")}
           autoFocus
-        />
-      </Field>
-
-      <Field label={t("contacts.add.shortName")} hint={t("contacts.add.shortNameHint")}>
-        <Input
-          value={shortName}
-          onChange={(event) => setShortName(event.target.value)}
-          placeholder={t("contacts.add.shortNamePlaceholder")}
         />
       </Field>
 

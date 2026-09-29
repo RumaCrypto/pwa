@@ -22,8 +22,9 @@ import { useUsdcBalance } from "@/hooks/use-usdc-balance";
 import { useConverted, useMoney } from "@/lib/money/money-context";
 import { fromDecimalString, fromMinor } from "@/lib/money/money";
 import { useContacts } from "@/lib/contacts/contacts-context";
-import { displayName } from "@/lib/contacts/contacts";
+import { displayName, type Contact } from "@/lib/contacts/contacts";
 import { AddContactSheet } from "@/components/contacts/add-contact-sheet";
+import { useSend } from "@/lib/send/send-context";
 import { useActivity, type ActivityEntry } from "@/lib/activity/activity";
 import { useLimits } from "@/lib/limits/limits-context";
 import { MAX_LEVEL } from "@/lib/limits/limits";
@@ -45,8 +46,14 @@ export default function HomePage() {
   const { entries } = useActivity(address);
   const { contacts } = useContacts();
   const { limits } = useLimits();
+  const { setContactId } = useSend();
   const [addingContact, setAddingContact] = useState(false);
   const [addressCopied, setAddressCopied] = useState(false);
+
+  const sendToContact = (contact: Contact) => {
+    setContactId(contact.id);
+    router.push("/send/amount");
+  };
 
   const copyAddress = async () => {
     if (!address) return;
@@ -150,8 +157,12 @@ export default function HomePage() {
           </span>
         </ContactButton>
         {contacts.map((contact) => (
-          <ContactButton key={contact.id} label={displayName(contact)}>
-            {/* Initials come from the short name, so "Rosa Cedeño" is R, not RC. */}
+          <ContactButton
+            key={contact.id}
+            label={displayName(contact)}
+            onClick={() => sendToContact(contact)}
+          >
+            {/* Initials come from the first word of the name, so "Rosa Cedeño" is R, not RC. */}
             <Avatar name={displayName(contact)} />
           </ContactButton>
         ))}

@@ -8,6 +8,7 @@ import { ResidencyProvider } from "@/lib/settings/residency-context";
 import { ContactsProvider } from "@/lib/contacts/contacts-context";
 import { LimitsProvider } from "@/lib/limits/limits-context";
 import { CardProviderContext } from "@/lib/card/card-context";
+import { SendProvider } from "@/lib/send/send-context";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
@@ -15,11 +16,13 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <I18nProvider>
         {/* Inside I18n: money formatting follows the active language. */}
         <MoneyProvider>
-          {/* Inside Money: picking a residency country sets the display currency. */}
           <ResidencyProvider>
             <ContactsProvider>
               <LimitsProvider>
-                <CardProviderContext>{children}</CardProviderContext>
+                <CardProviderContext>
+                  {/* Home needs this too, to prefill /send/amount from a contact tap. */}
+                  <SendProvider>{children}</SendProvider>
+                </CardProviderContext>
               </LimitsProvider>
             </ContactsProvider>
           </ResidencyProvider>
