@@ -55,6 +55,8 @@ export default function SendReviewStep() {
   if (!contact || !quote) return null;
 
   const name = displayName(contact);
+  // A Ruma contact receives the USDC sent as-is: no rate, no conversion, nothing to lock.
+  const isRuma = contact.payout.kind === "ruma";
 
   const handleSend = async () => {
     setError(null);
@@ -78,7 +80,7 @@ export default function SendReviewStep() {
       step={{ current: 3, total: 3 }}
       footer={
         <>
-          <Button variant="black" onClick={handleSend} disabled={expired || submitting}>
+          <Button variant="black" onClick={handleSend} disabled={(expired && !isRuma) || submitting}>
             {submitting ? t("sendFlow.step3.placing") : t("sendFlow.step3.send", { amount: format(quote.total) })}
           </Button>
           {error && (
@@ -109,22 +111,30 @@ export default function SendReviewStep() {
 
         <div className="my-2 border-t border-border-light" />
 
-        <DetailRow
-          label={t("sendFlow.step3.rate")}
-          value={new Intl.NumberFormat(LOCALES[language], { maximumFractionDigits: 2 }).format(quote.rate)}
-        />
-        <DetailRow
-          label={t("sendFlow.step3.receives", { name })}
-          // Symbol and code together read as "R$256,04 BRL"; the designs show the code alone.
-          value={`${format(quote.receive, { symbol: false })} ${quote.receive.currency}`}
-          emphasis
-        />
+        {isRuma ? (
+          <DetailRow label={t("sendFlow.step3.receives", { name })} value={format(quote.send)} emphasis />
+        ) : (
+          <>
+            <DetailRow
+              label={t("sendFlow.step3.rate")}
+              value={new Intl.NumberFormat(LOCALES[language], { maximumFractionDigits: 2 }).format(quote.rate)}
+            />
+            <DetailRow
+              label={t("sendFlow.step3.receives", { name })}
+              // Symbol and code together read as "R$256,04 BRL"; the designs show the code alone.
+              value={`${format(quote.receive, { symbol: false })} ${quote.receive.currency}`}
+              emphasis
+            />
+          </>
+        )}
         <DetailRow label={t("sendFlow.step3.arrives")} value={t("sendFlow.step3.arrivesValue")} />
       </Card>
 
-      <Callout className="mt-4">
-        {expired ? t("sendFlow.step3.expired") : t("sendFlow.step3.lockNote", { name })}
-      </Callout>
+      {!isRuma && (
+        <Callout className="mt-4">
+          {expired ? t("sendFlow.step3.expired") : t("sendFlow.step3.lockNote", { name })}
+        </Callout>
+      )}
     </Screen>
   );
 }
