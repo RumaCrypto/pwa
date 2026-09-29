@@ -73,8 +73,6 @@ export default function SettingsPage() {
         </Card>
       </Section>
 
-      <Callout title={t("tabs.home.balance")}>{format(fromNumber(1080.5, displayCurrency))}</Callout>
-
       <Section title={t("settings.security")}>
         <Card divided>
           <ListRow title={t("settings.signOut")} className="text-danger" onClick={handleSignOut} />
