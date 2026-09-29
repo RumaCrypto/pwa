@@ -9,8 +9,12 @@ import { Button } from "@/components/ui/button";
 import { StatusCard } from "@/components/ui/status-card";
 import { DetailRow } from "@/components/ui/detail-row";
 import { Timeline } from "@/components/ui/timeline";
+import { Badge } from "@/components/ui/badge";
 import { typography } from "@/constants/typography";
 
+import { formatEther } from "viem";
+
+import { truncateAddress } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { LOCALES } from "@/lib/i18n/languages";
 import { useContacts } from "@/lib/contacts/contacts-context";
@@ -18,7 +22,16 @@ import { countryName, displayName, localPayoutLabel, payoutReferenceDisplay } fr
 import { useSend } from "@/lib/send/send-context";
 import { useMoney } from "@/lib/money/money-context";
 import { useOrderTracking } from "@/lib/send/use-order-tracking";
-import { STAGES, progressFor, stageState, type Order } from "@/lib/send/orders";
+import {
+  RUMA_STAGES,
+  STAGES,
+  progressFor,
+  rumaProgressFor,
+  rumaStageState,
+  stageState,
+  type Order,
+  type RumaTransferOrder,
+} from "@/lib/send/orders";
 
 export default function SendTrackingScreen() {
   const router = useRouter();
@@ -63,6 +76,11 @@ export default function SendTrackingScreen() {
   }
 
   const name = contact ? displayName(contact) : t("common.to");
+
+  if (order.kind === "ruma") {
+    return <RumaTransferScreen order={order} name={name} contactName={contact?.name} country={contact ? countryName(contact.country, language) : undefined} address={contact?.payout.reference} />;
+  }
+
   const failed = order.phase === "failed";
 
   const label = failed
@@ -145,6 +163,106 @@ export default function SendTrackingScreen() {
         {contact && (
           <DetailRow label={t("contacts.add.country")} value={countryName(contact.country, language)} />
         )}
+      </Card>
+    </Screen>
+  );
+}
+
+interface RumaTransferScreenProps {
+  order: RumaTransferOrder;
+  name: string;
+  contactName?: string;
+  country?: string;
+  address?: string;
+}
+
+/**
+ * A plain USDC transfer has no merchant and no conversion, so it gets its own
+ * two-step view: submitted on the blockchain, then confirmed by its receipt.
+ */
+function RumaTransferScreen({ order, name, contactName, country, address }: RumaTransferScreenProps) {
+  const router = useRouter();
+  const { t } = useI18n();
+  const { format } = useMoney();
+
+  const failed = order.phase === "failed";
+  const completed = order.phase === "completed";
+
+  const label = failed
+    ? t("sendFlow.track.orderError")
+    : completed
+      ? t("sendFlow.track.rumaDelivered", { name })
+      : t("sendFlow.track.rumaSending", { name });
+  const caption = failed
+    ? t("sendFlow.track.orderErrorHint", { id: truncateAddress(order.id) })
+    : completed
+      ? undefined
+      : t("sendFlow.track.rumaInProgress");
+
+  const stageTitles = {
+    submitted: t("sendFlow.rumaStage.submitted"),
+    confirmed: t("sendFlow.rumaStage.confirmed"),
+  };
+  const stageHints = {
+    submitted: t("sendFlow.rumaStage.submittedHint"),
+    confirmed: completed
+      ? t("sendFlow.rumaStage.confirmedHint", { name })
+      : t("sendFlow.rumaStage.confirmedPendingHint"),
+  };
+
+  return (
+    <Screen
+      title={t("sendFlow.track.title", { id: truncateAddress(order.id) })}
+      backLabel={t("common.back")}
+      footer={
+        <Button variant="secondary" onClick={() => router.replace("/home")}>
+          {t("sendFlow.track.backHome")}
+        </Button>
+      }
+    >
+      <StatusCard
+        label={label}
+        progress={failed ? undefined : rumaProgressFor(order)}
+        caption={caption}
+        className={failed ? "bg-text-tertiary" : undefined}
+      >
+        <p style={typography.display4}>
+          {format(order.quote.send, { symbol: false })}
+          <small className="ml-1.5 text-lg opacity-60">USDC</small>
+        </p>
+      </StatusCard>
+
+      <div className="mt-6">
+        <Timeline
+          steps={RUMA_STAGES.map((key) => ({
+            title: stageTitles[key],
+            subtitle: stageHints[key],
+            state: rumaStageState(key, order),
+          }))}
+        />
+      </div>
+
+      <Card className="mt-6 px-5 py-3">
+        <DetailRow label={t("sendFlow.track.orderNumber")} value={truncateAddress(order.id)} />
+        <DetailRow label={t("sendFlow.track.recipient")} value={contactName ?? "—"} />
+        <DetailRow
+          label={t("sendFlow.track.receivesIn")}
+          value={address ? `${t("contacts.payout.ruma")} ·· ${truncateAddress(address)}` : "—"}
+        />
+        {country && <DetailRow label={t("contacts.add.country")} value={country} />}
+        <DetailRow
+          label={t("sendFlow.track.networkFee")}
+          value={
+            <span className="inline-flex items-center gap-2">
+              {order.networkFeeWei !== undefined && (
+                <span className="text-text-tertiary line-through">
+                  {Number(formatEther(order.networkFeeWei)).toFixed(7)} ETH
+                </span>
+              )}
+              <Badge>{t("sendFlow.track.free")}</Badge>
+            </span>
+          }
+        />
       </Card>
     </Screen>
   );

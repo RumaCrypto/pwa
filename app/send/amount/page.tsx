@@ -34,8 +34,13 @@ export default function SendAmountStep() {
   const { format } = useMoney();
 
   const contact = contactId ? findContact(contactId) : undefined;
-  const target = contact ? currencyOf(contact) : "USD";
-  const { rate, loading, error } = useRate("USD", target, contact?.country);
+  // A Ruma contact gets the same USDC that was sent: no fiat leg, so no rate to show.
+  const isRuma = contact?.payout.kind === "ruma";
+  const target = contact && !isRuma ? currencyOf(contact) : "USD";
+  const { rate: fetchedRate, loading: rateLoading, error: rateError } = useRate("USD", target, contact?.country);
+  const rate = isRuma ? 1 : fetchedRate;
+  const loading = !isRuma && rateLoading;
+  const error = !isRuma && rateError;
   const { limits } = useLimits();
 
   useEffect(() => {
@@ -97,21 +102,23 @@ export default function SendAmountStep() {
 
         <div className="my-4 border-t border-border-light" />
 
-        <p style={typography.body4} className={clsx(error ? "text-danger" : "text-primary-dark")}>
-          {loading
-            ? t("sendFlow.step2.rateLoading")
-            : error
-              ? t("sendFlow.step2.rateError")
-              : t("sendFlow.step2.rate", {
-                  from: "USD",
-                  rate: new Intl.NumberFormat(LOCALES[language], { maximumFractionDigits: 2 }).format(
-                    rate ?? 0
-                  ),
-                  to: target,
-                })}
-        </p>
+        {!isRuma && (
+          <p style={typography.body4} className={clsx(error ? "text-danger" : "text-primary-dark")}>
+            {loading
+              ? t("sendFlow.step2.rateLoading")
+              : error
+                ? t("sendFlow.step2.rateError")
+                : t("sendFlow.step2.rate", {
+                    from: "USD",
+                    rate: new Intl.NumberFormat(LOCALES[language], { maximumFractionDigits: 2 }).format(
+                      rate ?? 0
+                    ),
+                    to: target,
+                  })}
+          </p>
+        )}
 
-        <p style={typography.body3} className="mt-4 text-text-tertiary">
+        <p style={typography.body3} className={clsx("text-text-tertiary", !isRuma && "mt-4")}>
           {t("sendFlow.step2.receives", { name: displayName(contact) })}
         </p>
         <p style={typography.heading1} className="mt-0.5">

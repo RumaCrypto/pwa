@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Flags } from "@/lib/flags";
 import {
   formatLocalPayoutReference,
+  isValidRumaAddress,
   localPayoutFieldLabel,
   localPayoutFieldPlaceholder,
   localPayoutFields,
@@ -153,6 +154,26 @@ describe("localPayoutFieldLabel and localPayoutFieldPlaceholder", () => {
     };
     expect(localPayoutFieldLabel("EC", fakeField, "en")).toBe("Raw label");
     expect(localPayoutFieldPlaceholder("EC", fakeField, "en")).toBe("raw");
+  });
+});
+
+describe("isValidRumaAddress", () => {
+  it("accepts a well-formed wallet address, trimming surrounding whitespace", () => {
+    expect(isValidRumaAddress(" 0x5aeda56215b167893e80b4fe645ba6d5bab767de ")).toBe(true);
+  });
+
+  it("accepts a checksummed address", () => {
+    expect(isValidRumaAddress("0x5AEDA56215b167893e80B4fE645BA6d5Bab767DE")).toBe(true);
+  });
+
+  it("rejects an address with a broken checksum", () => {
+    expect(isValidRumaAddress("0x5AEDA56215b167893e80b4fE645BA6d5Bab767DE")).toBe(false);
+  });
+
+  it("rejects anything that isn't a wallet address", () => {
+    expect(isValidRumaAddress("rosa123")).toBe(false);
+    expect(isValidRumaAddress("0x123")).toBe(false);
+    expect(isValidRumaAddress("")).toBe(false);
   });
 });
 

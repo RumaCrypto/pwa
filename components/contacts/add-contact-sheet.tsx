@@ -13,6 +13,7 @@ import { useContacts } from "@/lib/contacts/contacts-context";
 import {
   COUNTRIES,
   countryName,
+  isValidRumaAddress,
   localPayoutFieldLabel,
   localPayoutFieldPlaceholder,
   localPayoutFields,
@@ -77,6 +78,7 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
       payoutReference = packLocalPayoutReference(country, fieldValues);
     } else {
       if (!reference.trim()) return setError(t("contacts.add.referenceRequired"));
+      if (kind === "ruma" && !isValidRumaAddress(reference)) return setError(t("contacts.add.invalidAddress"));
       payoutReference = reference.trim();
     }
 
@@ -154,7 +156,10 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
           </Field>
         ))
       ) : (
-        <Field label={t("contacts.add.reference")}>
+        <Field
+          label={kind === "ruma" ? t("contacts.add.address") : t("contacts.add.reference")}
+          hint={kind === "ruma" ? t("contacts.add.addressHint") : undefined}
+        >
           <Input
             value={reference}
             onChange={(event) => setReference(event.target.value)}
