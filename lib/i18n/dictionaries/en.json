@@ -566,7 +566,7 @@
   "limits.raise": "Raise your limit",
   "limits.raiseHint": "Each verification builds your reputation, which raises how much you can add.",
   "limits.method.liveness": "Face check",
-  "limits.method.livenessHint": "A quick selfie video. No document needed",
+  "limits.method.livenessHint": "A quick and private selfie video. No documents.",
   "limits.method.document": "Verify your document",
   "limits.method.documentHint": "Passport or ID, plus a face check",
   "limits.method.zkPassport": "ZK Passport",
