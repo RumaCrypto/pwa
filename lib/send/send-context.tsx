@@ -9,6 +9,7 @@ import { getP2pOrders } from "./p2p-orders";
 import { placeSellOrder } from "./order-execution";
 import type { Order } from "./orders";
 import type { Quote } from "./quote";
+import { readOrders, writeOrders } from "./order-storage";
 
 const ORDERS_KEY = "ruma-orders";
 
@@ -41,56 +42,8 @@ interface SendContextType {
 
 const SendContext = createContext<SendContextType | undefined>(undefined);
 
-type SerialisedMoney = { amount: string; currency: Quote["send"]["currency"] };
-
-function reviveMoney(value: unknown): Quote["send"] {
-  const money = value as SerialisedMoney;
-  return { amount: BigInt(money.amount), currency: money.currency };
-}
-
-type StoredOrder = Omit<Order, "createdAt" | "completedAt" | "quote" | "p2pOrderId" | "actualUsdcAmount" | "actualFiatAmount"> & {
-  createdAt: string;
-  completedAt?: string;
-  p2pOrderId: string;
-  actualUsdcAmount?: string;
-  actualFiatAmount?: string;
-  quote: Omit<Quote, "lockedAt" | "expiresAt"> & { lockedAt: string; expiresAt: string };
-};
-
-function readOrders(): Order[] {
-  try {
-    const raw = localStorage.getItem(ORDERS_KEY);
-    if (!raw) return [];
-
-    return (JSON.parse(raw) as StoredOrder[]).map((order) => ({
-      ...order,
-      createdAt: new Date(order.createdAt),
-      completedAt: order.completedAt ? new Date(order.completedAt) : undefined,
-      p2pOrderId: BigInt(order.p2pOrderId),
-      actualUsdcAmount: order.actualUsdcAmount !== undefined ? BigInt(order.actualUsdcAmount) : undefined,
-      actualFiatAmount: order.actualFiatAmount !== undefined ? BigInt(order.actualFiatAmount) : undefined,
-      quote: {
-        ...order.quote,
-        // JSON has no bigint; amounts were written as decimal strings.
-        send: reviveMoney(order.quote.send),
-        fee: reviveMoney(order.quote.fee),
-        total: reviveMoney(order.quote.total),
-        receive: reviveMoney(order.quote.receive),
-        lockedAt: new Date(order.quote.lockedAt),
-        expiresAt: new Date(order.quote.expiresAt),
-      },
-    }));
-  } catch {
-    return [];
-  }
-}
-
-function writeOrders(orders: Order[]): void {
-  localStorage.setItem(
-    ORDERS_KEY,
-    JSON.stringify(orders, (_key, value) => (typeof value === "bigint" ? value.toString() : value))
-  );
-}
+const readSendOrders = () => readOrders<Order>(ORDERS_KEY);
+const writeSendOrders = (orders: Order[]) => writeOrders(ORDERS_KEY, orders);
 
 export function SendProvider({ children }: { children: ReactNode }) {
   const [contactId, setContactId] = useState<string | null>(null);
@@ -126,19 +79,19 @@ export function SendProvider({ children }: { children: ReactNode }) {
       placeTxHash: txHash,
       phase: "awaiting_merchant",
     };
-    writeOrders([order, ...readOrders()]);
+    writeSendOrders([order, ...readSendOrders()]);
     return order;
   }, []);
 
-  const getOrder = useCallback((id: string) => readOrders().find((order) => order.id === id), []);
+  const getOrder = useCallback((id: string) => readSendOrders().find((order) => order.id === id), []);
 
   const updateOrder = useCallback((id: string, patch: Partial<Order>) => {
-    const orders = readOrders();
+    const orders = readSendOrders();
     const index = orders.findIndex((order) => order.id === id);
     if (index === -1) return undefined;
 
     orders[index] = { ...orders[index], ...patch };
-    writeOrders(orders);
+    writeSendOrders(orders);
     return orders[index];
   }, []);
 

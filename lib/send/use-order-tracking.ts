@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 
-import type { Contact } from "@/lib/contacts/contacts";
 import { useP2pWalletClient } from "@/hooks/use-p2p-wallet-client";
 import { getP2pOrders } from "./p2p-orders";
 import { submitPayoutAddress } from "./order-execution";
@@ -14,24 +13,28 @@ const MERCHANT_TIMEOUT_MS = 10 * 60_000;
 /** Merchant accepted and has the payout details; waiting for them to pay and settle. */
 const COMPLETION_TIMEOUT_MS = 30 * 60_000;
 
+/** The slice of an order the tracker reads, so withdrawals (which have no contact) can share it. */
+export type TrackedOrder = Pick<Order, "id" | "phase" | "p2pOrderId" | "acceptedMerchant">;
+
 /**
  * Polls a placed sell order until it settles, submitting the contact's
  * encrypted payout address the moment a merchant accepts. Safe to mount
  * against an order at any non-terminal phase — e.g. after a page reload.
  */
 export function useOrderTracking(
-  order: Order | null | undefined,
-  contact: Contact | undefined,
-  updateOrder: (id: string, patch: Partial<Order>) => Order | undefined
+  order: TrackedOrder | null | undefined,
+  /** Where the fiat should land: a contact's payout reference, or the user's saved withdrawal details. */
+  payoutReference: string | undefined,
+  updateOrder: (id: string, patch: Partial<Order>) => unknown
 ): void {
   const getWalletClient = useP2pWalletClient();
   const payoutSubmitting = useRef(false);
 
   useEffect(() => {
-    if (!order || !contact || isTerminal(order)) return;
+    if (!order || !payoutReference || isTerminal(order)) return;
 
     const currentOrder = order;
-    const currentContact = contact;
+    const currentPayoutReference = payoutReference;
     let stopped = false;
     const deadline =
       Date.now() + (currentOrder.phase === "awaiting_completion" ? COMPLETION_TIMEOUT_MS : MERCHANT_TIMEOUT_MS);
@@ -83,7 +86,7 @@ export function useOrderTracking(
             orderId: currentOrder.p2pOrderId,
             merchantPublicKey: fetched.pubkey,
             updatedAmount: fetched.fiatAmount,
-            paymentAddress: currentContact.payout.reference,
+            paymentAddress: currentPayoutReference,
           });
           updateOrder(currentOrder.id, { phase: "awaiting_completion" });
         } catch (err) {
@@ -103,5 +106,5 @@ export function useOrderTracking(
     return () => {
       stopped = true;
     };
-  }, [order, contact, getWalletClient, updateOrder]);
+  }, [order, payoutReference, getWalletClient, updateOrder]);
 }

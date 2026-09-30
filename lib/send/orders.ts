@@ -67,6 +67,6 @@ export function progressFor(order: Order): number {
   return (stageIndex(stageFor(order)) + 1) / STAGES.length;
 }
 
-export function isTerminal(order: Order): boolean {
+export function isTerminal<T extends Pick<Order, "phase">>(order: T): boolean {
   return order.phase === "completed" || order.phase === "failed";
 }

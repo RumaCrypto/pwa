@@ -13,22 +13,21 @@ import { typography } from "@/constants/typography";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { LOCALES } from "@/lib/i18n/languages";
-import { useContacts } from "@/lib/contacts/contacts-context";
-import { countryName, displayName, localPayoutLabel, payoutReferenceDisplay } from "@/lib/contacts/contacts";
-import { useSend } from "@/lib/send/send-context";
+import { countryName, formatLocalPayoutReference, localPayoutLabel } from "@/lib/contacts/contacts";
+import { useWithdraw, type WithdrawOrder } from "@/lib/withdraw/withdraw-context";
 import { useMoney } from "@/lib/money/money-context";
 import { useOrderTracking } from "@/lib/send/use-order-tracking";
-import { STAGES, progressFor, stageState, type Order } from "@/lib/send/orders";
+import { STAGES, progressFor, stageState } from "@/lib/send/orders";
+import type { Order } from "@/lib/send/orders";
 
-export default function SendTrackingScreen() {
+export default function WithdrawTrackingScreen() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const { t, language } = useI18n();
-  const { findContact } = useContacts();
-  const { getOrder, updateOrder } = useSend();
+  const { getOrder, updateOrder } = useWithdraw();
   const { format } = useMoney();
 
-  const [order, setOrder] = useState<Order | null | undefined>(undefined);
+  const [order, setOrder] = useState<WithdrawOrder | null | undefined>(undefined);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect --
@@ -36,8 +35,6 @@ export default function SendTrackingScreen() {
     setOrder(getOrder(id) ?? null);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [id, getOrder]);
-
-  const contact = order ? findContact(order.contactId) : undefined;
 
   const handleOrderUpdate = useCallback(
     (orderId: string, patch: Partial<Order>) => {
@@ -48,36 +45,37 @@ export default function SendTrackingScreen() {
     [updateOrder]
   );
 
-  useOrderTracking(order, contact?.payout.reference, handleOrderUpdate);
+  useOrderTracking(order, order?.payoutReference, handleOrderUpdate);
 
   if (order === undefined) return null;
 
   if (order === null) {
     return (
-      <Screen title={t("sendFlow.track.title", { id })} backLabel={t("common.back")}>
+      <Screen title={t("withdrawFlow.track.title", { id })} backLabel={t("common.back")}>
         <p style={typography.body3} className="text-text-secondary">
-          {t("sendFlow.track.notFound")}
+          {t("withdrawFlow.track.notFound")}
         </p>
       </Screen>
     );
   }
 
-  const name = contact ? displayName(contact) : t("common.to");
   const failed = order.phase === "failed";
+  // A stored order needs an `Order`-shaped value for the stage helpers, which only read these fields.
+  const staged = { ...order, contactId: "" };
 
   const label = failed
     ? order.failureReason === "cancelled"
-      ? t("sendFlow.track.cancelled")
+      ? t("withdrawFlow.track.cancelled")
       : order.failureReason === "timeout"
         ? t("sendFlow.track.merchantTimeout")
         : t("sendFlow.track.orderError")
     : order.phase === "completed"
-      ? t("sendFlow.track.delivered", { name })
-      : t("sendFlow.track.onItsWay", { name });
+      ? t("withdrawFlow.track.delivered")
+      : t("withdrawFlow.track.onItsWay");
 
   const caption = failed
     ? order.failureReason === "cancelled"
-      ? t("sendFlow.track.cancelledHint", { name })
+      ? t("withdrawFlow.track.cancelledHint")
       : order.failureReason === "timeout"
         ? t("sendFlow.track.merchantTimeoutHint", { id: order.id })
         : t("sendFlow.track.orderErrorHint", { id: order.id })
@@ -86,17 +84,17 @@ export default function SendTrackingScreen() {
       : t("sendFlow.track.inProgress");
 
   const stageHints: Record<(typeof STAGES)[number], string> = {
-    funded: t("sendFlow.stage.fundedHint", { amount: format(order.quote.total) }),
+    funded: t("withdrawFlow.stage.fundedHint", { amount: format(order.quote.total) }),
     converted: t("sendFlow.stage.convertedHint", {
       rate: new Intl.NumberFormat(LOCALES[language], { maximumFractionDigits: 2 }).format(order.quote.rate),
     }),
-    paying: t("sendFlow.stage.payingHint"),
-    delivered: t("sendFlow.stage.deliveredHint"),
+    paying: t("withdrawFlow.stage.payingHint"),
+    delivered: t("withdrawFlow.stage.deliveredHint"),
   };
 
   return (
     <Screen
-      title={t("sendFlow.track.title", { id: order.id })}
+      title={t("withdrawFlow.track.title", { id: order.id })}
       backLabel={t("common.back")}
       footer={
         <Button variant="secondary" onClick={() => router.replace("/home")}>
@@ -106,7 +104,7 @@ export default function SendTrackingScreen() {
     >
       <StatusCard
         label={label}
-        progress={failed ? undefined : progressFor(order)}
+        progress={failed ? undefined : progressFor(staged)}
         caption={caption}
         className={failed ? "bg-text-tertiary" : undefined}
       >
@@ -119,32 +117,20 @@ export default function SendTrackingScreen() {
       <div className="mt-6">
         <Timeline
           steps={STAGES.map((key) => ({
-            title:
-              key === "paying" || key === "delivered" ? t(`sendFlow.stage.${key}`, { name }) : t(`sendFlow.stage.${key}`),
+            title: t(`withdrawFlow.stage.${key}`),
             subtitle: stageHints[key],
-            state: failed && stageState(key, order) === "current" ? "pending" : stageState(key, order),
+            state: failed && stageState(key, staged) === "current" ? "pending" : stageState(key, staged),
           }))}
         />
       </div>
 
       <Card className="mt-6 px-5 py-3">
-        <DetailRow label={t("sendFlow.track.orderNumber")} value={order.id} />
-        <DetailRow label={t("sendFlow.track.recipient")} value={contact?.name ?? "—"} />
+        <DetailRow label={t("withdrawFlow.track.orderNumber")} value={order.id} />
         <DetailRow
           label={t("sendFlow.track.receivesIn")}
-          value={
-            contact
-              ? `${
-                  contact.payout.kind === "local"
-                    ? localPayoutLabel(contact.country)
-                    : t(`contacts.payout.${contact.payout.kind}` as "contacts.payout.ruma" | "contacts.payout.cash")
-                } ·· ${payoutReferenceDisplay(contact, language)}`
-              : "—"
-          }
+          value={`${localPayoutLabel(order.country) ?? ""} ·· ${formatLocalPayoutReference(order.country, order.payoutReference, language)}`}
         />
-        {contact && (
-          <DetailRow label={t("contacts.add.country")} value={countryName(contact.country, language)} />
-        )}
+        <DetailRow label={t("contacts.add.country")} value={countryName(order.country, language)} />
       </Card>
     </Screen>
   );
