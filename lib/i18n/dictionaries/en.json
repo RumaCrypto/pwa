@@ -713,7 +713,7 @@
   "help.contact.title": "Still stuck?",
   "help.contact.body": "Support is not connected yet. It will live here.",
   "withdrawFlow.details.title": "Where should we pay you?",
-  "withdrawFlow.details.subtitle": "Your {method} details in {country}. We save them for next time.",
+  "withdrawFlow.details.subtitle": "Your {method} details in {country}. Saved on your device for next withdrawañs.",
   "withdrawFlow.details.savedNote": "Saved on this device only. Double-check them — a wrong detail sends money to the wrong place.",
   "withdrawFlow.details.noMethod": "Withdrawing to a local payment method is not available for your country yet.",
   "withdrawFlow.amount.title": "How much are you withdrawing?",

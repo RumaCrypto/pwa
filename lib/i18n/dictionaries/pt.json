@@ -713,7 +713,7 @@
   "help.contact.title": "Ainda travado?",
   "help.contact.body": "O suporte ainda não está conectado. Ficará aqui.",
   "withdrawFlow.details.title": "Onde pagamos você?",
-  "withdrawFlow.details.subtitle": "Seus dados de {method} em {country}. Guardamos para a próxima vez.",
+  "withdrawFlow.details.subtitle": "Seus dados de {method} em {country}. Guardado na seu dispositivo para a próxima vez.",
   "withdrawFlow.details.savedNote": "Salvos apenas neste dispositivo. Confira bem: um dado errado envia o dinheiro para o lugar errado.",
   "withdrawFlow.details.noMethod": "Sacar para um método de pagamento local ainda não está disponível no seu país.",
   "withdrawFlow.amount.title": "Quanto você vai sacar?",
