@@ -11,6 +11,7 @@ import { Timeline } from "@/components/ui/timeline";
 import { DetailRow } from "@/components/ui/detail-row";
 import { AccordionItem } from "@/components/ui/accordion";
 import { typography } from "@/constants/typography";
+import { openSupport } from "@/constants/support";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { LOCALES } from "@/lib/i18n/languages";
@@ -27,8 +28,6 @@ const TOPICS = [
   { key: "card", Icon: CreditCard },
   { key: "limits", Icon: Gauge },
 ] as const;
-
-const SUPPORT_URL = "https://t.me/danielarroyoeth";
 
 const FAQS = [1, 2, 3, 4, 5, 6] as const;
 
@@ -75,7 +74,7 @@ export default function HelpScreen() {
       </Section>
 
       <Callout className="mt-8" title={t("help.contact.title")}>
-        <Button className="mt-4" onClick={() => window.open(SUPPORT_URL, "_blank", "noopener,noreferrer")}>
+        <Button className="mt-4" onClick={openSupport}>
           <Headset size={20} />
           {t("tabs.help.contactSupport.title")}
         </Button>
