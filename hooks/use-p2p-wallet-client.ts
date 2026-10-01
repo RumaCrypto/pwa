@@ -5,7 +5,7 @@ import { usePrivy, useSendTransaction, useWallets } from "@privy-io/react-auth";
 import {
   createWalletClient,
   custom,
-  Hex,
+  // Hex,
   type Address,
   type WalletClient,
 } from "viem";
@@ -15,7 +15,7 @@ import { DEFAULT_SETTLEMENT_NETWORK } from "@/constants/blockchain";
 export function useP2pWalletClient() {
   const { user } = usePrivy();
   const { wallets } = useWallets();
-  const { sendTransaction } = useSendTransaction();
+  // const { sendTransaction } = useSendTransaction();
 
   return useCallback(async (): Promise<{
     walletClient: WalletClient;
@@ -34,24 +34,24 @@ export function useP2pWalletClient() {
     await wallet.switchChain(DEFAULT_SETTLEMENT_NETWORK.id);
     const provider = await wallet.getEthereumProvider();
 
-    const sponsoredTransport = custom({
-      async request({ method, params }: { method: string; params?: unknown }) {
-        if (method === "eth_sendTransaction") {
-          const [tx] = params as [Record<string, unknown>];
-          const { hash } = await sendTransaction(
-            { ...tx, chainId: DEFAULT_SETTLEMENT_NETWORK.id },
-            { sponsor: true, address },
-          );
-          return hash as Hex; // eth_sendTransaction must resolve to the tx hash
-        }
-        return provider.request({ method, params } as never);
-      },
-    });
+    // const sponsoredTransport = custom({
+    //   async request({ method, params }: { method: string; params?: unknown }) {
+    //     if (method === "eth_sendTransaction") {
+    //       const [tx] = params as [Record<string, unknown>];
+    //       const { hash } = await sendTransaction(
+    //         { ...tx, chainId: DEFAULT_SETTLEMENT_NETWORK.id },
+    //         { sponsor: true, address },
+    //       );
+    //       return hash as Hex; // eth_sendTransaction must resolve to the tx hash
+    //     }
+    //     return provider.request({ method, params } as never);
+    //   },
+    // });
 
     const walletClient = createWalletClient({
       account: address as Address,
       chain: DEFAULT_SETTLEMENT_NETWORK,
-      transport: sponsoredTransport,
+      transport: custom(provider), // TODO: Use sponsoredTransport once sponsoring is solved (Issue with "walletClient.sendTransaction rejected")
     });
 
     return { walletClient, address: address as Address };
