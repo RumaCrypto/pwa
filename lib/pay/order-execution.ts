@@ -35,7 +35,7 @@ export interface PlacePayOrderResult {
  * Approves the diamond for `usdcAmount` if the current allowance falls
  * short, then places the PAY order. The merchant's payment address (parsed
  * from the scanned QR) isn't known on-chain yet — it's attached later via
- * `setSellOrderUpi` once a merchant accepts, exactly like a SELL order's
+ * `setSellOrderUpiWithFiat` once a merchant accepts, exactly like a SELL order's
  * payout address. `recipientAddr` is the user's own address for the same
  * reason `placeSellOrder` uses it: the real destination isn't an on-chain
  * account at all, it's whatever the QR encodes.

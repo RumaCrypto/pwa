@@ -38,7 +38,7 @@ export interface Order {
   acceptedMerchant?: string;
   /** The accepted merchant's ECIES public key — needed to encrypt the scanned address. */
   merchantPubkey?: string;
-  /** The order's fiat amount at acceptance time — passed as `setSellOrderUpi`'s `updatedAmount`. */
+  /** The order's fiat amount at acceptance time — kept for reference; the payout is sent with `updatedFiatAmount: 0n` (order unchanged). */
   pendingFiatAmount?: bigint;
   /** The business' payment address, parsed from the QR once the user scans it. */
   paymentAddress?: string;

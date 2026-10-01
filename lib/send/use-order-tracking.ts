@@ -112,7 +112,6 @@ export function useOrderTracking(
             walletClient,
             orderId: currentOrder.p2pOrderId,
             merchantPublicKey: fetched.pubkey,
-            updatedAmount: fetched.fiatAmount,
             paymentAddress: currentContact.payout.reference,
           });
           updateOrder(currentOrder.id, { phase: "awaiting_completion" });
