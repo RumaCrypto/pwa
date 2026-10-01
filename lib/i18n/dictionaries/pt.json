@@ -662,7 +662,7 @@
   "cashflow.unavailable.bank": "As transferências bancárias passam pela p2p.me, que ainda não está conectada.",
   "cashflow.unavailable.cash": "Os pontos Ruma ainda não estão conectados.",
   "cashflow.receive.title": "Receber dólares digitais",
-  "cashflow.receive.hint": "Envie USDC na rede Base para este endereço. O que for enviado por outra rede se perde.",
+  "cashflow.receive.hint": "Envie USDC na rede Base para este endereço. O que for enviado por outra rede pode-se perder.",
   "cashflow.receive.address": "Seu endereço",
   "cashflow.receive.network": "Rede",
   "cashflow.receive.asset": "Ativo",

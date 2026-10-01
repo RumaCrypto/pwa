@@ -9,6 +9,7 @@ import { Screen } from "@/components/ui/screen";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
+import { QrCode } from "@/components/ui/qr-code";
 import { DetailRow } from "@/components/ui/detail-row";
 import { typography } from "@/constants/typography";
 
@@ -58,7 +59,11 @@ function ReceiveAddress() {
 
       {address ? (
         <>
-          <Card className="mt-5 px-5 py-5">
+          <div className="mt-5 flex justify-center">
+            <QrCode value={address} label={t("cashflow.receive.address")} />
+          </div>
+
+          <Card className="mt-4 px-5 py-5">
             <p style={typography.body3} className="text-text-tertiary">
               {t("cashflow.receive.address")}
             </p>
