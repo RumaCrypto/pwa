@@ -110,6 +110,7 @@ export default function HomePage() {
             label={t("home.balance.label")}
             caption={t("home.balance.caption")}
             footer={t("home.balance.footer")}
+            backgroundImage="/RumaBalanceCardBg.png"
             className="min-h-44"
           >
             <p style={typography.display1} className={clsx(pending && "opacity-60")}>
