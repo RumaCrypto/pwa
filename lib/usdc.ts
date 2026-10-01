@@ -19,7 +19,7 @@ export const erc20TransferAbi = [
     stateMutability: "nonpayable",
     inputs: [
       { name: "to", type: "address" },
-      { name: "value", type: "uint256" },
+      { name: "amount", type: "uint256" },
     ],
     outputs: [{ name: "", type: "bool" }],
   },

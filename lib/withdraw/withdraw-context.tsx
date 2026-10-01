@@ -8,7 +8,7 @@ import { getP2pOrders } from "@/lib/send/p2p-orders";
 import { placeSellOrder } from "@/lib/send/order-execution";
 import { readOrders, writeOrders, type StorableOrder } from "@/lib/send/order-storage";
 import type { Quote } from "@/lib/send/quote";
-import type { Order } from "@/lib/send/orders";
+import type { OrderPatch } from "@/lib/send/send-context";
 
 const ORDERS_KEY = "ruma-withdraw-orders";
 
@@ -42,7 +42,7 @@ interface WithdrawContextType {
   setQuote: (quote: Quote | null) => void;
   placeOrder: (params: PlaceWithdrawParams) => Promise<WithdrawOrder>;
   getOrder: (id: string) => WithdrawOrder | undefined;
-  updateOrder: (id: string, patch: Partial<Order>) => WithdrawOrder | undefined;
+  updateOrder: (id: string, patch: OrderPatch) => WithdrawOrder | undefined;
   reset: () => void;
 }
 
@@ -68,6 +68,7 @@ export function WithdrawProvider({ children }: { children: ReactNode }) {
       });
 
       const order: WithdrawOrder = {
+        kind: "p2p",
         id: p2pOrderId.toString(),
         country,
         payoutReference,
@@ -85,12 +86,12 @@ export function WithdrawProvider({ children }: { children: ReactNode }) {
 
   const getOrder = useCallback((id: string) => readWithdrawals().find((order) => order.id === id), []);
 
-  const updateOrder = useCallback((id: string, patch: Partial<Order>) => {
+  const updateOrder = useCallback((id: string, patch: OrderPatch) => {
     const orders = readWithdrawals();
     const index = orders.findIndex((order) => order.id === id);
     if (index === -1) return undefined;
 
-    orders[index] = { ...orders[index], ...patch };
+    orders[index] = { ...orders[index], ...patch } as WithdrawOrder;
     writeOrders(ORDERS_KEY, orders);
     return orders[index];
   }, []);

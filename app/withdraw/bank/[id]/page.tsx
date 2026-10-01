@@ -18,7 +18,7 @@ import { useWithdraw, type WithdrawOrder } from "@/lib/withdraw/withdraw-context
 import { useMoney } from "@/lib/money/money-context";
 import { useOrderTracking } from "@/lib/send/use-order-tracking";
 import { STAGES, progressFor, stageState } from "@/lib/send/orders";
-import type { Order } from "@/lib/send/orders";
+import type { OrderPatch } from "@/lib/send/send-context";
 
 export default function WithdrawTrackingScreen() {
   const router = useRouter();
@@ -37,7 +37,7 @@ export default function WithdrawTrackingScreen() {
   }, [id, getOrder]);
 
   const handleOrderUpdate = useCallback(
-    (orderId: string, patch: Partial<Order>) => {
+    (orderId: string, patch: OrderPatch) => {
       const updated = updateOrder(orderId, patch);
       if (updated) setOrder(updated);
       return updated;

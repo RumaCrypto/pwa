@@ -1,8 +1,8 @@
-import type { Order } from "./orders";
+import type { P2pOrder } from "./orders";
 import type { Quote } from "./quote";
 
 /** What storage needs from an order; withdrawals have no contact, sends do. */
-export type StorableOrder = Omit<Order, "contactId">;
+export type StorableOrder = Omit<P2pOrder, "contactId">;
 
 type SerialisedMoney = { amount: string; currency: Quote["send"]["currency"] };
 
