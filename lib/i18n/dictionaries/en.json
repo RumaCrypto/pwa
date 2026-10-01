@@ -67,6 +67,7 @@
   "onboarding.import.backup.placeholder": "Upload the backup file that you have on Google Drive",
   "tabs.home": "Home",
   "tabs.home.greeting": "Hello",
+  "tabs.home.address": "Your address",
   "tabs.home.balance": "Total Balance",
   "tabs.home.myAssets": "My assets",
   "tabs.home.noBalance": "You have no crypto yet. Deposit or buy some first.",

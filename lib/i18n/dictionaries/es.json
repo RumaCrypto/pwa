@@ -86,6 +86,7 @@
   "wallet.opening_setup": "Abriendo configuración...",
   "tabs.home": "Inicio",
   "tabs.home.greeting": "Hola",
+  "tabs.home.address": "Tu dirección",
   "tabs.home.balance": "Balance total",
   "tabs.home.myAssets": "Mis activos",
   "tabs.home.noBalance": "Todavía no tienes activos digitales",

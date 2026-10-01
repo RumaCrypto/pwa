@@ -76,6 +76,8 @@ export default function HomePage() {
         <button onClick={copyAddress} disabled={!address} className="active:opacity-70">
           <Badge className="gap-2 py-1.5 pl-1.5 pr-3">
             <span className="h-5 w-5 rounded-full bg-primary" />
+            <div className="flex flex-col">
+              <span className="text-xs">{t("tabs.home.address")}:</span>
             <span>
               {addressCopied
                 ? t("common.copied")
@@ -83,6 +85,7 @@ export default function HomePage() {
                   ? truncateAddress(address)
                   : t("tabs.home.greeting")}
             </span>
+            </div>
           </Badge>
         </button>
 
