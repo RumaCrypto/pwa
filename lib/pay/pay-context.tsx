@@ -166,7 +166,6 @@ export function PayProvider({ children }: { children: ReactNode }) {
         walletClient,
         orderId: order.p2pOrderId,
         merchantPublicKey: order.merchantPubkey,
-        updatedAmount: order.pendingFiatAmount ?? 0n,
         paymentAddress,
       });
 

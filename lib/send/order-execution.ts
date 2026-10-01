@@ -87,8 +87,8 @@ export interface SubmitPayoutAddressParams {
   orderId: bigint;
   /** The accepted merchant's public key, from `Order.pubkey`. */
   merchantPublicKey: string;
-  /** The order's current fiat amount, from `Order.fiatAmount`. */
-  updatedAmount: bigint;
+  /** Currrent order's fiat amount to pin the order to; `0n` (default) keeps the order as placed. */
+  updatedFiatAmount?: bigint;
   /** The contact's payout reference (Pix key, Nequi phone, bank account, ...). */
   paymentAddress: string;
 }
@@ -105,14 +105,14 @@ export async function submitPayoutAddress({
   walletClient,
   orderId,
   merchantPublicKey,
-  updatedAmount,
+  updatedFiatAmount = 0n,
   paymentAddress,
 }: SubmitPayoutAddressParams): Promise<void> {
-  const setUpiResult = await orders.setSellOrderUpi.execute({
+  const setUpiResult = await orders.setSellOrderUpiWithFiat.execute({
     orderId,
     paymentAddress,
     merchantPublicKey,
-    updatedAmount,
+    updatedFiatAmount,
     walletClient: toSdkWalletClient(walletClient),
     waitForReceipt: true,
   });

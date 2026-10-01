@@ -5,3 +5,6 @@ allowBuilds:
   msgpackr-extract: true
   sharp: true
   utf-8-validate: true
+
+onlyBuiltDependencies:
+  - msgpackr-extract
