@@ -61,7 +61,7 @@ export default function SendTrackingScreen() {
     [updateOrder]
   );
 
-  useOrderTracking(order, contact, handleOrderUpdate);
+  useOrderTracking(order, contact?.payout.reference, handleOrderUpdate);
 
   if (order === undefined) return null;
 
