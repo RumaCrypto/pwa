@@ -50,7 +50,12 @@ function revive(stored: StoredDeposit): IntentDeposit {
 
 function readAll(storage: DepositStorage): Record<string, StoredDeposit> {
   try {
-    return JSON.parse(storage.getItem(DEPOSITS_KEY) ?? "{}");
+    const parsed = JSON.parse(storage.getItem(DEPOSITS_KEY) ?? "{}");
+    // Guard against valid JSON that isn't an object (null, array, string, etc.)
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    return {};
   } catch {
     return {};
   }

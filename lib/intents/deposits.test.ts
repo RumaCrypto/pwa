@@ -66,4 +66,18 @@ describe("deposit storage", () => {
     storage.setItem("ruma-intent-deposits", "{not json");
     expect(getDeposit(storage, "TXyz")).toBeUndefined();
   });
+
+  it("survives valid JSON that is not an object (null, array, string, etc.)", () => {
+    const storage = memoryStorage();
+    storage.setItem("ruma-intent-deposits", "null");
+    expect(getDeposit(storage, "TXyz")).toBeUndefined();
+  });
+
+  it("can save a deposit after storage held non-object JSON", () => {
+    const storage = memoryStorage();
+    storage.setItem("ruma-intent-deposits", "null");
+    const deposit = depositFromQuote(QUOTE, "tron", "USDT", NOW);
+    saveDeposit(storage, deposit);
+    expect(getDeposit(storage, "TXyz")).toEqual(deposit);
+  });
 });
