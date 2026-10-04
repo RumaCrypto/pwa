@@ -16,8 +16,8 @@ import {
 
 // Typed so a new flag has to be accounted for here rather than defaulting
 // silently; these suites only vary cashPoints.
-const on: Flags = { cashPoints: true, card: false };
-const off: Flags = { cashPoints: false, card: false };
+const on: Flags = { cashPoints: true, card: false, multichainDeposits: false };
+const off: Flags = { cashPoints: false, card: false, multichainDeposits: false };
 
 describe("payoutKindsFor", () => {
   it("hides cash payout while no Ruma points exist", () => {

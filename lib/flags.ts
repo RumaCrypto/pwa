@@ -7,9 +7,12 @@ export interface Flags {
   cashPoints: boolean;
   /** No card issuer is connected, so the card stays a teaser and /card is closed. */
   card: boolean;
+  /** Aurora Intents needs an API key from Intents Studio; without one, deposits from other networks would fail at the quote. */
+  multichainDeposits: boolean;
 }
 
 export const FLAGS: Flags = {
   cashPoints: process.env.NEXT_PUBLIC_FEATURE_CASH_POINTS === "true",
   card: process.env.NEXT_PUBLIC_FEATURE_CARD === "true",
+  multichainDeposits: process.env.NEXT_PUBLIC_FEATURE_MULTICHAIN_DEPOSITS === "true",
 };

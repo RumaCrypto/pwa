@@ -30,8 +30,8 @@ describe("method catalogues", () => {
 
 // Typed so a new flag has to be accounted for here rather than defaulting
 // silently; these suites only vary cashPoints.
-const on: Flags = { cashPoints: true, card: false };
-const off: Flags = { cashPoints: false, card: false };
+const on: Flags = { cashPoints: true, card: false, multichainDeposits: false };
+const off: Flags = { cashPoints: false, card: false, multichainDeposits: false };
 
 describe("enabledMethods", () => {
   it("hides cash while no Ruma points exist", () => {
