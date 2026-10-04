@@ -9,12 +9,14 @@ interface RadioCardProps {
   description?: ReactNode;
   /** Small tag above the title, such as "Advanced". */
   tag?: ReactNode;
+  /** Shown under the description, e.g. the logos of the networks an option covers. */
+  leading?: ReactNode;
   selected: boolean;
   disabled?: boolean;
   onSelect: () => void;
 }
 
-export function RadioCard({ title, description, tag, selected, disabled, onSelect }: RadioCardProps) {
+export function RadioCard({ title, description, tag, leading, selected, disabled, onSelect }: RadioCardProps) {
   return (
     <button
       type="button"
@@ -45,6 +47,7 @@ export function RadioCard({ title, description, tag, selected, disabled, onSelec
             {description}
           </span>
         )}
+        {leading && <span className="mt-3 block">{leading}</span>}
       </span>
 
       <span
