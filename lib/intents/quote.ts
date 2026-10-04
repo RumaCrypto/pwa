@@ -93,7 +93,8 @@ export function buildQuoteRequest({
 /**
  * The quote route forwards to Aurora with our API key and fee settings, so it
  * only lets through the one shape this app sends: a deposit that ends as USDC
- * on Base in an EVM address.
+ * on Base in an EVM address. Returns a fresh object with only the 12 required
+ * fields, stripping any extra fields from the input.
  */
 export function validateQuoteRequest(body: unknown, mode: RefundMode): QuoteRequest | null {
   if (!body || typeof body !== "object") return null;
@@ -104,6 +105,8 @@ export function validateQuoteRequest(body: unknown, mode: RefundMode): QuoteRequ
       ? r.refundType === "INTENTS" && typeof r.recipient === "string" && r.refundTo === r.recipient.toLowerCase()
       : r.refundType === "ORIGIN_CHAIN" && typeof r.refundTo === "string" && r.refundTo.trim() !== "";
 
+  const amountValid = typeof r.amount === "string" && /^\d+$/.test(r.amount) && BigInt(r.amount) > 0n;
+
   const ok =
     r.dry === false &&
     r.swapType === "FLEX_INPUT" &&
@@ -113,14 +116,29 @@ export function validateQuoteRequest(body: unknown, mode: RefundMode): QuoteRequ
     refundOk &&
     r.slippageTolerance === DEPOSIT_SLIPPAGE_BPS &&
     typeof r.originAsset === "string" &&
-    typeof r.amount === "string" &&
-    /^\d+$/.test(r.amount) &&
+    amountValid &&
     typeof r.recipient === "string" &&
     isAddress(r.recipient) &&
     typeof r.deadline === "string" &&
     !Number.isNaN(Date.parse(r.deadline));
 
-  return ok ? (r as unknown as QuoteRequest) : null;
+  if (!ok) return null;
+
+  // Return a fresh object with only the 12 QuoteRequest fields, stripping unknowns.
+  return {
+    dry: false,
+    swapType: "FLEX_INPUT",
+    slippageTolerance: DEPOSIT_SLIPPAGE_BPS,
+    originAsset: r.originAsset as string,
+    depositType: "ORIGIN_CHAIN",
+    destinationAsset: USDC_BASE_ASSET_ID,
+    amount: r.amount as string,
+    recipient: r.recipient as string,
+    recipientType: "DESTINATION_CHAIN",
+    refundTo: r.refundTo as string,
+    refundType: r.refundType as "ORIGIN_CHAIN" | "INTENTS",
+    deadline: r.deadline as string,
+  };
 }
 
 export function parseQuoteResponse(body: unknown): QuoteResult {

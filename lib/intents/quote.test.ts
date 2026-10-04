@@ -100,7 +100,17 @@ describe("validateQuoteRequest", () => {
     expect(validateQuoteRequest({ ...valid, recipientType: "INTENTS" }, "origin")).toBeNull();
     expect(validateQuoteRequest({ ...valid, recipient: "alice.near" }, "origin")).toBeNull();
     expect(validateQuoteRequest({ ...valid, amount: "-1" }, "origin")).toBeNull();
+    expect(validateQuoteRequest({ ...valid, amount: "0" }, "origin")).toBeNull();
     expect(validateQuoteRequest(null, "origin")).toBeNull();
+  });
+
+  it("strips unknown fields and returns only the 12 QuoteRequest fields", () => {
+    const withExtra = { ...valid, appFees: "100", referral: "alice.near" };
+    const result = validateQuoteRequest(withExtra, "origin");
+    expect(result).not.toBeNull();
+    expect(result).toEqual(valid);
+    expect(result).not.toHaveProperty("appFees");
+    expect(result).not.toHaveProperty("referral");
   });
 });
 
