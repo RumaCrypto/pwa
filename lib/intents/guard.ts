@@ -1,3 +1,5 @@
+import { FLAGS } from "@/lib/flags";
+
 export interface GuardConfig {
   authRequired: boolean;
   rateLimit: { limit: number; windowMs: number } | null;
@@ -80,13 +82,26 @@ export async function guardRequest(
 
 let sharedLimiter: Limiter | null | undefined;
 
+/**
+ * Vercel's Upstash integration sets the UPSTASH_* names, but stores created as
+ * "Vercel KV" set KV_REST_API_*; either points at the same kind of database.
+ */
+export function redisCredentials(
+  env: Record<string, string | undefined> = process.env
+): { url: string; token: string } | null {
+  const url = env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL;
+  const token = env.UPSTASH_REDIS_REST_TOKEN || env.KV_REST_API_TOKEN;
+  return url && token ? { url, token } : null;
+}
+
 /** Redis when Upstash is connected (exact across Vercel instances), memory otherwise. */
 async function buildLimiter(rateLimit: NonNullable<GuardConfig["rateLimit"]>): Promise<Limiter> {
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  const credentials = redisCredentials();
+  if (credentials) {
     const { Ratelimit } = await import("@upstash/ratelimit");
     const { Redis } = await import("@upstash/redis");
     const ratelimit = new Ratelimit({
-      redis: Redis.fromEnv(),
+      redis: new Redis(credentials),
       limiter: Ratelimit.slidingWindow(rateLimit.limit, `${rateLimit.windowMs / 1000} s`),
       prefix: "ruma:intents",
     });
@@ -99,6 +114,8 @@ export type IntentsRoute = "tokens" | "quote" | "status";
 
 /** Limits are counted per route, so status polling does not eat the quote budget. */
 export async function intentsGuard(request: Request, route: IntentsRoute): Promise<Caller | Response> {
+  // With the feature off the routes should not exist, not just be unlinked.
+  if (!FLAGS.multichainDeposits) return deny(404, "Not found");
   const config = readGuardConfig();
   if (config.authRequired && (!process.env.PRIVY_APP_SECRET || !process.env.NEXT_PUBLIC_PRIVY_APP_ID)) {
     return deny(503, "Session check is not configured");

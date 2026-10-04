@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { notFound, useParams, useRouter } from "next/navigation";
 import { Check, Copy } from "lucide-react";
 
 import { Screen } from "@/components/ui/screen";
@@ -12,16 +12,32 @@ import { DetailRow } from "@/components/ui/detail-row";
 import { StatusCard } from "@/components/ui/status-card";
 import { typography } from "@/constants/typography";
 
+import { FLAGS } from "@/lib/flags";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { formatDayAndTime } from "@/lib/datetime";
 import { findNetwork } from "@/lib/intents/networks";
 import { getDeposit, updateDeposit, type IntentDeposit } from "@/lib/intents/deposits";
 import { useDepositStatus } from "@/lib/intents/use-deposit-status";
 
-export default function IntentDepositScreen() {
+export default function IntentDepositPage() {
+  // Checked in a wrapper because notFound() throws and the screen below has hooks.
+  if (!FLAGS.multichainDeposits) notFound();
+  return <IntentDepositScreen />;
+}
+
+/** A malformed link (e.g. a stray "%") would otherwise crash the screen instead of showing "not found". */
+function decodeAddress(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function IntentDepositScreen() {
   const router = useRouter();
   const { address: rawAddress } = useParams<{ address: string }>();
-  const address = decodeURIComponent(rawAddress);
+  const address = decodeAddress(rawAddress);
   const { t } = useI18n();
   const [deposit, setDeposit] = useState<IntentDeposit | null | undefined>(undefined);
 
@@ -40,7 +56,7 @@ export default function IntentDepositScreen() {
     [address]
   );
 
-  useDepositStatus(deposit, handleUpdate);
+  const expired = useDepositStatus(deposit, handleUpdate);
 
   if (deposit === undefined) return null;
 
@@ -58,10 +74,27 @@ export default function IntentDepositScreen() {
     return <DepositReceived deposit={deposit} onDone={() => router.replace("/home")} />;
   }
 
-  return <AwaitingDeposit deposit={deposit} onHome={() => router.replace("/home")} />;
+  return (
+    <AwaitingDeposit
+      deposit={deposit}
+      expired={expired}
+      onHome={() => router.replace("/home")}
+      onNewAddress={() => router.push(`/add-money/wallet/networks/${deposit.network}`)}
+    />
+  );
 }
 
-function AwaitingDeposit({ deposit, onHome }: { deposit: IntentDeposit; onHome: () => void }) {
+function AwaitingDeposit({
+  deposit,
+  expired,
+  onHome,
+  onNewAddress,
+}: {
+  deposit: IntentDeposit;
+  expired: boolean;
+  onHome: () => void;
+  onNewAddress: () => void;
+}) {
   const { t, language } = useI18n();
   const network = findNetwork(deposit.network);
   const [copied, setCopied] = useState(false);
@@ -96,7 +129,11 @@ function AwaitingDeposit({ deposit, onHome }: { deposit: IntentDeposit; onHome: 
       title={t("intents.deposit.title", params)}
       backLabel={t("common.back")}
       footer={
-        failed || deposit.phase === "processing" ? (
+        expired ? (
+          <Button variant="black" onClick={onNewAddress}>
+            {t("intents.deposit.newAddress")}
+          </Button>
+        ) : failed || deposit.phase === "processing" ? (
           <Button variant="secondary" onClick={onHome}>
             {t("intents.done.backHome")}
           </Button>
@@ -108,32 +145,40 @@ function AwaitingDeposit({ deposit, onHome }: { deposit: IntentDeposit; onHome: 
         )
       }
     >
-      <StatusCard label={label} caption={caption} className={failed ? "bg-text-tertiary" : undefined}>
+      <StatusCard
+        label={expired ? t("intents.deposit.expired") : label}
+        caption={expired ? t("intents.deposit.expiredHint") : caption}
+        className={failed || expired ? "bg-text-tertiary" : undefined}
+      >
         <p style={typography.display4}>
           {deposit.amountInFormatted} {deposit.assetSymbol}
         </p>
       </StatusCard>
 
-      {!failed && <Callout className="mt-5">{t("intents.deposit.warning", params)}</Callout>}
+      {!failed && !expired && <Callout className="mt-5">{t("intents.deposit.warning", params)}</Callout>}
 
-      <Card className="mt-4 px-5 py-5">
-        <p style={typography.body3} className="text-text-tertiary">
-          {t("intents.deposit.address")}
-        </p>
-        <p style={typography.body2} className="mt-2 break-all font-mono">
-          {deposit.depositAddress}
-        </p>
-        {deposit.depositMemo && (
-          <>
-            <p style={typography.body3} className="mt-4 text-text-tertiary">
-              {t("intents.deposit.memo")}
-            </p>
-            <p style={typography.body2} className="mt-2 break-all font-mono">
-              {deposit.depositMemo}
-            </p>
-          </>
-        )}
-      </Card>
+      {/* An expired address must not look usable: Aurora would refund anything sent to it.
+          Failed deposits keep it, since support needs it to trace the funds. */}
+      {!expired && (
+        <Card className="mt-4 px-5 py-5">
+          <p style={typography.body3} className="text-text-tertiary">
+            {t("intents.deposit.address")}
+          </p>
+          <p style={typography.body2} className="mt-2 break-all font-mono">
+            {deposit.depositAddress}
+          </p>
+          {deposit.depositMemo && (
+            <>
+              <p style={typography.body3} className="mt-4 text-text-tertiary">
+                {t("intents.deposit.memo")}
+              </p>
+              <p style={typography.body2} className="mt-2 break-all font-mono">
+                {deposit.depositMemo}
+              </p>
+            </>
+          )}
+        </Card>
+      )}
 
       <Card className="mt-4 px-5 py-3">
         <DetailRow label={t("intents.deposit.send")} value={`${deposit.amountInFormatted} ${deposit.assetSymbol}`} />

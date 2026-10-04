@@ -11,15 +11,19 @@ import { Input } from "@/components/ui/input";
 import { RadioCard } from "@/components/ui/radio-card";
 import { typography } from "@/constants/typography";
 
+import { FLAGS } from "@/lib/flags";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { assetsForNetwork, findNetwork, isNetworkId, isValidRefundAddress, type DepositAsset, type Network } from "@/lib/intents/networks";
 import { buildQuoteRequest, parseAmount, refundModeFrom, type Refund } from "@/lib/intents/quote";
 import { depositFromQuote, saveDeposit } from "@/lib/intents/deposits";
 import { fetchTokens, requestDepositQuote } from "@/lib/intents/api";
+import { errorKey } from "@/lib/intents/errors";
 
 const REFUND_MODE = refundModeFrom(process.env.NEXT_PUBLIC_INTENTS_REFUND_MODE);
 
 export default function NetworkAssetPage() {
+  // FLAGS is fixed at build time, so this never changes the hook order below.
+  if (!FLAGS.multichainDeposits) notFound();
   const { network: networkParam } = useParams<{ network: string }>();
   // Validate before any other hook runs; notFound() throws, so it can't sit above hooks.
   if (!isNetworkId(networkParam)) notFound();
@@ -37,7 +41,8 @@ function AssetAndAmount({ network }: { network: Network }) {
   const [amountText, setAmountText] = useState("");
   const [refundAddress, setRefundAddress] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Kept raw and translated at render, so the copy follows the language picker.
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,7 +54,7 @@ function AssetAndAmount({ network }: { network: Network }) {
         setAssets(available);
         setAssetId(available[0]?.assetId ?? null);
       })
-      .catch((err) => !cancelled && setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) => !cancelled && setError(err ?? new Error("Unknown error")));
     return () => {
       cancelled = true;
     };
@@ -65,6 +70,12 @@ function AssetAndAmount({ network }: { network: Network }) {
     return asset && value > 0 ? `$${(value * asset.priceUsd).toFixed(2)}` : null;
   }, [amountText, asset]);
 
+  // Our own refusals and crashes get translated copy; Aurora's 4xx (e.g. amount
+  // below its minimum) is shown as it says, since it tells the user what to change.
+  const errorKeyFor = error == null ? null : errorKey(error);
+  const errorText =
+    error == null ? null : errorKeyFor ? t(errorKeyFor) : error instanceof Error ? error.message : String(error);
+
   const handleGenerate = async () => {
     if (!asset || !amount || !refundValid || !recipient || !isAddress(recipient)) return;
     setError(null);
@@ -75,7 +86,7 @@ function AssetAndAmount({ network }: { network: Network }) {
       saveDeposit(localStorage, depositFromQuote(quote, network.id, asset.symbol, now));
       router.push(`/add-money/wallet/deposit/${encodeURIComponent(quote.depositAddress)}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(err ?? new Error("Unknown error"));
       setSubmitting(false);
     }
   };
@@ -89,9 +100,9 @@ function AssetAndAmount({ network }: { network: Network }) {
           <Button variant="black" onClick={handleGenerate} disabled={!amount || !refundValid || !recipient || submitting}>
             {submitting ? t("intents.asset.generating") : t("intents.asset.generate")}
           </Button>
-          {error && (
+          {errorText && (
             <p style={typography.body5} className="mt-3 text-center text-danger">
-              {error}
+              {errorText}
             </p>
           )}
         </>
@@ -101,7 +112,14 @@ function AssetAndAmount({ network }: { network: Network }) {
         {t("intents.asset.question")}
       </h2>
 
-      {assets === null && !error && (
+      {/* Without a wallet there is nowhere to send the USDC, so the button stays off; say why. */}
+      {!recipient && (
+        <p style={typography.body3} className="mb-6 text-text-secondary">
+          {t("cashflow.receive.noWallet")}
+        </p>
+      )}
+
+      {assets === null && error == null && (
         <p style={typography.body3} className="text-text-secondary">
           {t("intents.asset.loading")}
         </p>

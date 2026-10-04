@@ -2,10 +2,21 @@ import type { IntentsToken } from "./networks";
 import { parseQuoteResponse, type QuoteRequest, type QuoteResult } from "./quote";
 import { parseStatusResponse, type StatusResult } from "./status";
 
-async function errorFrom(response: Response): Promise<Error> {
+/** Keeps the HTTP status so the screen can tell our own refusals from Aurora's messages. */
+export class IntentsApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = "IntentsApiError";
+  }
+}
+
+async function errorFrom(response: Response): Promise<IntentsApiError> {
   const body = (await response.json().catch(() => null)) as { message?: unknown; error?: unknown } | null;
   const message = body?.message ?? body?.error;
-  return new Error(typeof message === "string" ? message : `Request failed (${response.status})`);
+  return new IntentsApiError(typeof message === "string" ? message : `Request failed (${response.status})`, response.status);
 }
 
 /** The routes check the Privy session when INTENTS_AUTH_REQUIRED is on; sending it always keeps the client agnostic. */

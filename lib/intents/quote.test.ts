@@ -84,33 +84,42 @@ describe("validateQuoteRequest", () => {
   const intents = buildQuoteRequest({ asset: USDT_TRON, amount: 1n, recipient: USER, refund: { type: "INTENTS" }, now: NOW });
 
   it("passes a request the app itself built", () => {
-    expect(validateQuoteRequest(valid, "origin")).toEqual(valid);
-    expect(validateQuoteRequest(intents, "intents")).toEqual(intents);
+    expect(validateQuoteRequest(valid, "origin", NOW)).toEqual(valid);
+    expect(validateQuoteRequest(intents, "intents", NOW)).toEqual(intents);
   });
 
   it("only accepts the refund mode the server is configured for", () => {
-    expect(validateQuoteRequest(intents, "origin")).toBeNull();
-    expect(validateQuoteRequest(valid, "intents")).toBeNull();
-    expect(validateQuoteRequest({ ...valid, refundTo: "" }, "origin")).toBeNull();
-    expect(validateQuoteRequest({ ...intents, refundTo: "someone.near" }, "intents")).toBeNull();
+    expect(validateQuoteRequest(intents, "origin", NOW)).toBeNull();
+    expect(validateQuoteRequest(valid, "intents", NOW)).toBeNull();
+    expect(validateQuoteRequest({ ...valid, refundTo: "" }, "origin", NOW)).toBeNull();
+    expect(validateQuoteRequest({ ...intents, refundTo: "someone.near" }, "intents", NOW)).toBeNull();
   });
 
   it("refuses anything that would not land as USDC on Base", () => {
-    expect(validateQuoteRequest({ ...valid, destinationAsset: "nep141:wrap.near" }, "origin")).toBeNull();
-    expect(validateQuoteRequest({ ...valid, recipientType: "INTENTS" }, "origin")).toBeNull();
-    expect(validateQuoteRequest({ ...valid, recipient: "alice.near" }, "origin")).toBeNull();
-    expect(validateQuoteRequest({ ...valid, amount: "-1" }, "origin")).toBeNull();
-    expect(validateQuoteRequest({ ...valid, amount: "0" }, "origin")).toBeNull();
-    expect(validateQuoteRequest(null, "origin")).toBeNull();
+    expect(validateQuoteRequest({ ...valid, destinationAsset: "nep141:wrap.near" }, "origin", NOW)).toBeNull();
+    expect(validateQuoteRequest({ ...valid, recipientType: "INTENTS" }, "origin", NOW)).toBeNull();
+    expect(validateQuoteRequest({ ...valid, recipient: "alice.near" }, "origin", NOW)).toBeNull();
+    expect(validateQuoteRequest({ ...valid, amount: "-1" }, "origin", NOW)).toBeNull();
+    expect(validateQuoteRequest({ ...valid, amount: "0" }, "origin", NOW)).toBeNull();
+    expect(validateQuoteRequest(null, "origin", NOW)).toBeNull();
   });
 
   it("strips unknown fields and returns only the 12 QuoteRequest fields", () => {
     const withExtra = { ...valid, appFees: "100", referral: "alice.near" };
-    const result = validateQuoteRequest(withExtra, "origin");
+    const result = validateQuoteRequest(withExtra, "origin", NOW);
     expect(result).not.toBeNull();
     expect(result).toEqual(valid);
     expect(result).not.toHaveProperty("appFees");
     expect(result).not.toHaveProperty("referral");
+  });
+
+  it("only accepts a deadline in the future and at most two hours away", () => {
+    const at = (ms: number) => ({ ...valid, deadline: new Date(NOW.getTime() + ms).toISOString() });
+    expect(validateQuoteRequest(at(-1000), "origin", NOW)).toBeNull();
+    expect(validateQuoteRequest(at(0), "origin", NOW)).toBeNull();
+    expect(validateQuoteRequest(at(3 * 3600_000), "origin", NOW)).toBeNull();
+    expect(validateQuoteRequest(at(3600_000), "origin", NOW)).toEqual(at(3600_000));
+    expect(validateQuoteRequest(at(2 * 3600_000), "origin", NOW)).toEqual(at(2 * 3600_000));
   });
 });
 
@@ -151,5 +160,22 @@ describe("parseQuoteResponse", () => {
     expect(() => parseQuoteResponse({ ...body, quote: { ...body.quote, depositAddress: undefined } })).toThrow(
       /deposit address/
     );
+  });
+
+  it("fails loudly on a deadline that is not a date, rather than showing \"Invalid Date\"", () => {
+    expect(() => parseQuoteResponse({ ...body, quote: { ...body.quote, deadline: "soon" } })).toThrow(/deadline/);
+    expect(() => parseQuoteResponse({ ...body, quote: { ...body.quote, deadline: undefined } })).toThrow(/deadline/);
+  });
+
+  it("fails loudly when an amount is missing, rather than showing \"undefined\"", () => {
+    for (const field of ["amountInFormatted", "amountOutFormatted", "minAmountIn", "minAmountOut"]) {
+      expect(() => parseQuoteResponse({ ...body, quote: { ...body.quote, [field]: undefined } })).toThrow(field);
+      expect(() => parseQuoteResponse({ ...body, quote: { ...body.quote, [field]: 25 } })).toThrow(field);
+    }
+  });
+
+  it("fails loudly when the time estimate is not a number", () => {
+    expect(() => parseQuoteResponse({ ...body, quote: { ...body.quote, timeEstimate: "fast" } })).toThrow(/timeEstimate/);
+    expect(() => parseQuoteResponse({ ...body, quote: { ...body.quote, timeEstimate: undefined } })).toThrow(/timeEstimate/);
   });
 });

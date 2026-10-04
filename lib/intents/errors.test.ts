@@ -1,0 +1,33 @@
+import { describe, expect, it } from "vitest";
+import { IntentsApiError } from "./api";
+import { errorKey } from "./errors";
+
+const api = (status: number, message = "x") => new IntentsApiError(message, status);
+
+describe("errorKey", () => {
+  it("translates the statuses our own routes answer with", () => {
+    expect(errorKey(api(401, "Sign in required"))).toBe("intents.errors.session");
+    expect(errorKey(api(403, "Recipient must be your own wallet"))).toBe("intents.errors.wallet");
+    expect(errorKey(api(429, "Too many requests, try again in a minute"))).toBe("intents.errors.rateLimit");
+    expect(errorKey(api(503, "Deposits from other networks are not configured"))).toBe("intents.errors.unavailable");
+    expect(errorKey(api(404, "Not found"))).toBe("intents.errors.unavailable");
+  });
+
+  it("treats our own validation failure as a generic error, since the user cannot fix it", () => {
+    expect(errorKey(api(400, "Invalid quote request"))).toBe("intents.errors.generic");
+  });
+
+  it("shows Aurora's own 4xx message as-is, e.g. an amount below its minimum", () => {
+    expect(errorKey(api(400, "Amount is too low for bridge, try at least 1.5"))).toBeNull();
+    expect(errorKey(api(422, "Unsupported asset"))).toBeNull();
+  });
+
+  it("hides server failures and anything that is not an API answer behind a generic error", () => {
+    expect(errorKey(api(500, "Internal error"))).toBe("intents.errors.generic");
+    expect(errorKey(api(502, "fetch failed"))).toBe("intents.errors.generic");
+    expect(errorKey(new TypeError("Failed to fetch"))).toBe("intents.errors.generic");
+    expect(errorKey(new Error("Aurora returned no deposit address"))).toBe("intents.errors.generic");
+    expect(errorKey(new RangeError("Invalid time value"))).toBe("intents.errors.generic");
+    expect(errorKey("boom")).toBe("intents.errors.generic");
+  });
+});

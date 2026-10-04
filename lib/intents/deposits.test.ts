@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { depositFromQuote, getDeposit, saveDeposit, updateDeposit, type DepositStorage } from "./deposits";
+import {
+  EXPIRY_GRACE_MS,
+  depositFromQuote,
+  getDeposit,
+  isExpired,
+  saveDeposit,
+  updateDeposit,
+  type DepositStorage,
+} from "./deposits";
 import type { QuoteResult } from "./quote";
 
 function memoryStorage(): DepositStorage {
@@ -79,5 +87,32 @@ describe("deposit storage", () => {
     const deposit = depositFromQuote(QUOTE, "tron", "USDT", NOW);
     saveDeposit(storage, deposit);
     expect(getDeposit(storage, "TXyz")).toEqual(deposit);
+  });
+});
+
+describe("isExpired", () => {
+  const deposit = depositFromQuote(QUOTE, "tron", "USDT", NOW);
+  const deadline = deposit.deadline.getTime();
+
+  it("keeps the address active until the deadline plus a grace period", () => {
+    expect(isExpired(deposit, NOW)).toBe(false);
+    expect(isExpired(deposit, new Date(deadline + EXPIRY_GRACE_MS))).toBe(false);
+  });
+
+  it("expires a waiting or incomplete deposit once the grace period is over", () => {
+    const after = new Date(deadline + EXPIRY_GRACE_MS + 1);
+    expect(isExpired(deposit, after)).toBe(true);
+    expect(isExpired({ ...deposit, phase: "incomplete" }, after)).toBe(true);
+  });
+
+  it("never expires a deposit that already arrived or ended", () => {
+    const after = new Date(deadline + EXPIRY_GRACE_MS + 1);
+    for (const phase of ["processing", "completed", "refunded", "failed"] as const) {
+      expect(isExpired({ ...deposit, phase }, after)).toBe(false);
+    }
+  });
+
+  it("gives a two-minute grace so a transfer sent just before the deadline is still tracked", () => {
+    expect(EXPIRY_GRACE_MS).toBe(2 * 60 * 1000);
   });
 });

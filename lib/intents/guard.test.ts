@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryLimiter, guardRequest, readGuardConfig, type GuardConfig } from "./guard";
+import { createMemoryLimiter, guardRequest, readGuardConfig, redisCredentials, type GuardConfig } from "./guard";
 
 describe("readGuardConfig", () => {
   it("requires a session and limits to 30 per minute by default", () => {
@@ -67,5 +67,27 @@ describe("guardRequest", () => {
     const res = await guardRequest(req({ Authorization: "Bearer good" }), { config: on, verify, limiter });
     expect((res as Response).status).toBe(429);
     expect(limiter).toHaveBeenCalledWith("did:privy:1");
+  });
+});
+
+describe("redisCredentials", () => {
+  it("reads the Upstash names", () => {
+    expect(redisCredentials({ UPSTASH_REDIS_REST_URL: "https://u", UPSTASH_REDIS_REST_TOKEN: "t" })).toEqual({
+      url: "https://u",
+      token: "t",
+    });
+  });
+
+  it("falls back to the names Vercel KV sets", () => {
+    expect(redisCredentials({ KV_REST_API_URL: "https://kv", KV_REST_API_TOKEN: "k" })).toEqual({
+      url: "https://kv",
+      token: "k",
+    });
+  });
+
+  it("returns null unless both a URL and a token are set", () => {
+    expect(redisCredentials({})).toBeNull();
+    expect(redisCredentials({ UPSTASH_REDIS_REST_URL: "https://u" })).toBeNull();
+    expect(redisCredentials({ KV_REST_API_TOKEN: "k" })).toBeNull();
   });
 });

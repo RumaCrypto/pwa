@@ -75,6 +75,22 @@ export function depositFromQuote(quote: QuoteResult, network: NetworkId, assetSy
   };
 }
 
+/**
+ * Aurora may still pick up a transfer broadcast just before the deadline, so
+ * the address is only shown as expired a little after it.
+ */
+export const EXPIRY_GRACE_MS = 2 * 60 * 1000;
+
+/**
+ * Past the deadline Aurora refunds anything sent to the address, so a deposit
+ * still waiting for (more) funds must stop presenting it as usable. Once funds
+ * arrived the deadline no longer matters: Aurora settles or refunds on its own.
+ */
+export function isExpired(deposit: Pick<IntentDeposit, "phase" | "deadline">, now: Date): boolean {
+  const waiting = deposit.phase === "awaiting_deposit" || deposit.phase === "incomplete";
+  return waiting && now.getTime() > deposit.deadline.getTime() + EXPIRY_GRACE_MS;
+}
+
 export function saveDeposit(storage: DepositStorage, deposit: IntentDeposit): void {
   const all = readAll(storage);
   all[deposit.depositAddress] = serialise(deposit);

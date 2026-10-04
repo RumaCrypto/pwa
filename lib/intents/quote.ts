@@ -5,6 +5,8 @@ import { USDC_BASE_ASSET_ID, type DepositAsset } from "./networks";
 export const DEPOSIT_SLIPPAGE_BPS = 100;
 /** How long the one-time address accepts a deposit before Aurora starts refunding. */
 export const DEPOSIT_WINDOW_MS = 60 * 60 * 1000;
+/** The route accepts some clock skew over DEPOSIT_WINDOW_MS, but not addresses that live for days. */
+const MAX_DEADLINE_MS = 2 * 60 * 60 * 1000;
 
 export interface QuoteRequest {
   dry: false;
@@ -96,7 +98,7 @@ export function buildQuoteRequest({
  * on Base in an EVM address. Returns a fresh object with only the 12 required
  * fields, stripping any extra fields from the input.
  */
-export function validateQuoteRequest(body: unknown, mode: RefundMode): QuoteRequest | null {
+export function validateQuoteRequest(body: unknown, mode: RefundMode, now: Date = new Date()): QuoteRequest | null {
   if (!body || typeof body !== "object") return null;
   const r = body as Record<string, unknown>;
 
@@ -106,6 +108,11 @@ export function validateQuoteRequest(body: unknown, mode: RefundMode): QuoteRequ
       : r.refundType === "ORIGIN_CHAIN" && typeof r.refundTo === "string" && r.refundTo.trim() !== "";
 
   const amountValid = typeof r.amount === "string" && /^\d+$/.test(r.amount) && BigInt(r.amount) > 0n;
+
+  // A past deadline gives an address that is dead on arrival; a far one keeps
+  // funds parked with Aurora for longer than the screen promises.
+  const deadlineMs = typeof r.deadline === "string" ? Date.parse(r.deadline) : NaN;
+  const deadlineValid = deadlineMs > now.getTime() && deadlineMs <= now.getTime() + MAX_DEADLINE_MS;
 
   const ok =
     r.dry === false &&
@@ -119,8 +126,7 @@ export function validateQuoteRequest(body: unknown, mode: RefundMode): QuoteRequ
     amountValid &&
     typeof r.recipient === "string" &&
     isAddress(r.recipient) &&
-    typeof r.deadline === "string" &&
-    !Number.isNaN(Date.parse(r.deadline));
+    deadlineValid;
 
   if (!ok) return null;
 
@@ -147,14 +153,26 @@ export function parseQuoteResponse(body: unknown): QuoteResult {
     throw new Error("Aurora returned no deposit address");
   }
 
+  // Anything else malformed would surface as "undefined" or "Invalid Date" on
+  // the deposit screen, or crash it, so it fails here with a clear reason.
+  for (const field of ["amountInFormatted", "minAmountIn", "amountOutFormatted", "minAmountOut"] as const) {
+    if (typeof quote[field] !== "string") throw new Error(`Aurora returned no ${field}`);
+  }
+  if (typeof quote.deadline !== "string" || Number.isNaN(Date.parse(quote.deadline))) {
+    throw new Error("Aurora returned an invalid deadline");
+  }
+  if (typeof quote.timeEstimate !== "number" || !Number.isFinite(quote.timeEstimate)) {
+    throw new Error("Aurora returned an invalid timeEstimate");
+  }
+
   return {
     depositAddress: quote.depositAddress,
     depositMemo: typeof quote.depositMemo === "string" ? quote.depositMemo : undefined,
-    amountInFormatted: String(quote.amountInFormatted),
-    minAmountIn: String(quote.minAmountIn),
-    amountOutFormatted: String(quote.amountOutFormatted),
-    minAmountOut: String(quote.minAmountOut),
-    deadline: String(quote.deadline),
-    timeEstimate: Number(quote.timeEstimate),
+    amountInFormatted: quote.amountInFormatted as string,
+    minAmountIn: quote.minAmountIn as string,
+    amountOutFormatted: quote.amountOutFormatted as string,
+    minAmountOut: quote.minAmountOut as string,
+    deadline: quote.deadline,
+    timeEstimate: quote.timeEstimate,
   };
 }

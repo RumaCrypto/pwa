@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchDepositStatus, requestDepositQuote } from "./api";
+import { IntentsApiError, fetchDepositStatus, requestDepositQuote } from "./api";
 import type { QuoteRequest } from "./quote";
 
 const json = (status: number, body: unknown) =>
@@ -34,6 +34,12 @@ describe("requestDepositQuote", () => {
     await expect(requestDepositQuote(REQUEST, "tok", json(400, { message: "Amount is too low" }))).rejects.toThrow(
       "Amount is too low"
     );
+  });
+
+  it("keeps the HTTP status on the error so the screen can translate it", async () => {
+    const error = await requestDepositQuote(REQUEST, "tok", json(429, { error: "Too many requests" })).catch((e) => e);
+    expect(error).toBeInstanceOf(IntentsApiError);
+    expect(error).toMatchObject({ status: 429, message: "Too many requests" });
   });
 });
 
