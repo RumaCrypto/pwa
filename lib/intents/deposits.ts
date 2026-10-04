@@ -1,6 +1,6 @@
 import type { NetworkId } from "./networks";
 import type { QuoteResult } from "./quote";
-import type { DepositPhase } from "./status";
+import { isTerminal, type DepositPhase } from "./status";
 
 const DEPOSITS_KEY = "ruma-intent-deposits";
 
@@ -89,6 +89,12 @@ export const EXPIRY_GRACE_MS = 2 * 60 * 1000;
 export function isExpired(deposit: Pick<IntentDeposit, "phase" | "deadline">, now: Date): boolean {
   const waiting = deposit.phase === "awaiting_deposit" || deposit.phase === "incomplete";
   return waiting && now.getTime() > deposit.deadline.getTime() + EXPIRY_GRACE_MS;
+}
+
+/** What the status poller does after a status is known: stop, mark the address expired and stop, or poll again. */
+export function nextPollAction(phase: DepositPhase, deadline: Date, now: Date): "stop" | "expired" | "continue" {
+  if (isTerminal(phase)) return "stop";
+  return isExpired({ phase, deadline }, now) ? "expired" : "continue";
 }
 
 export function saveDeposit(storage: DepositStorage, deposit: IntentDeposit): void {

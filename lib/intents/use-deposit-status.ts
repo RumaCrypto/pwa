@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 
 import { fetchDepositStatus } from "./api";
-import { isExpired, type IntentDeposit } from "./deposits";
+import { nextPollAction, type IntentDeposit } from "./deposits";
 import { isTerminal, phaseFor } from "./status";
 
 const POLL_MS = 5000;
@@ -35,27 +35,29 @@ export function useDepositStatus(
     let timer: ReturnType<typeof setTimeout>;
 
     async function tick() {
-      // Nothing from Aurora marks the deadline passing, so it is re-checked
-      // against the clock on every tick, before spending a status call.
-      if (isExpired({ phase: phase!, deadline: new Date(deadline!) }, new Date())) {
-        setExpiredAddress(address!);
-        return;
-      }
+      // The stored phase can be stale (the deposit may have settled while the
+      // app was closed), so status is always fetched once before deciding the
+      // address expired. Only a failed fetch falls back to the stored phase.
+      let current = phase!;
       try {
         const result = await fetchDepositStatus(address!, memo, await getAccessToken());
         if (stopped) return;
-        const next = phaseFor(result.status);
+        current = phaseFor(result.status);
         onUpdate({
-          phase: next,
+          phase: current,
           receivedFormatted: result.receivedFormatted,
           destinationTxHash: result.destinationTxHash,
-          ...(next === "completed" ? { completedAt: new Date() } : {}),
+          ...(current === "completed" ? { completedAt: new Date() } : {}),
         });
-        if (isTerminal(next)) return;
       } catch (err) {
         console.error("Failed to fetch Aurora deposit status", err);
       }
-      if (!stopped) timer = setTimeout(tick, POLL_MS);
+      if (stopped) return;
+      // Nothing from Aurora marks the deadline passing, so it is checked
+      // against the clock after every attempt.
+      const action = nextPollAction(current, new Date(deadline!), new Date());
+      if (action === "expired") setExpiredAddress(address!);
+      if (action === "continue") timer = setTimeout(tick, POLL_MS);
     }
 
     tick();

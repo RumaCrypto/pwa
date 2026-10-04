@@ -4,6 +4,7 @@ import {
   depositFromQuote,
   getDeposit,
   isExpired,
+  nextPollAction,
   saveDeposit,
   updateDeposit,
   type DepositStorage,
@@ -114,5 +115,29 @@ describe("isExpired", () => {
 
   it("gives a two-minute grace so a transfer sent just before the deadline is still tracked", () => {
     expect(EXPIRY_GRACE_MS).toBe(2 * 60 * 1000);
+  });
+});
+
+describe("nextPollAction", () => {
+  const deadline = new Date("2026-01-01T12:00:00Z");
+  const early = new Date(deadline.getTime() - 1000);
+  const late = new Date(deadline.getTime() + EXPIRY_GRACE_MS + 1);
+
+  it("stops on a completed deposit even long after the deadline", () => {
+    expect(nextPollAction("completed", deadline, late)).toBe("stop");
+  });
+  it("stops on refunded and failed", () => {
+    expect(nextPollAction("refunded", deadline, late)).toBe("stop");
+    expect(nextPollAction("failed", deadline, early)).toBe("stop");
+  });
+  it("continues while awaiting before the deadline", () => {
+    expect(nextPollAction("awaiting_deposit", deadline, early)).toBe("continue");
+  });
+  it("continues while processing after the deadline", () => {
+    expect(nextPollAction("processing", deadline, late)).toBe("continue");
+  });
+  it("expires awaiting and incomplete deposits after deadline plus grace", () => {
+    expect(nextPollAction("awaiting_deposit", deadline, late)).toBe("expired");
+    expect(nextPollAction("incomplete", deadline, late)).toBe("expired");
   });
 });
