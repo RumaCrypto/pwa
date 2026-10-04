@@ -1,3 +1,5 @@
+import "server-only";
+
 export const AURORA_API_URL = "https://intents-api.aurora.dev";
 
 type Endpoint = "tokens" | "quote" | "status";

@@ -1,12 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auroraApiKey, auroraUrl } from "@/lib/intents/aurora";
+import { intentsGuard } from "@/lib/intents/guard";
 
 export const runtime = "nodejs";
 
 const FETCH_TIMEOUT_MS = 8000;
 
 /** The token list changes rarely; caching it spares Aurora's per-key rate limit. */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const caller = await intentsGuard(request);
+  if (caller instanceof Response) return caller;
+
   const apiKey = auroraApiKey();
   if (!apiKey) return NextResponse.json({ error: "Deposits from other networks are not configured" }, { status: 503 });
 

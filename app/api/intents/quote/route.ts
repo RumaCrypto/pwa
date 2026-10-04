@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auroraApiKey, auroraUrl } from "@/lib/intents/aurora";
+import { intentsGuard } from "@/lib/intents/guard";
+import { userWalletAddress } from "@/lib/intents/privy-server";
 import { refundModeFrom, validateQuoteRequest } from "@/lib/intents/quote";
 
 export const runtime = "nodejs";
@@ -8,6 +10,9 @@ export const runtime = "nodejs";
 const FETCH_TIMEOUT_MS = 20000;
 
 export async function POST(request: NextRequest) {
+  const caller = await intentsGuard(request);
+  if (caller instanceof Response) return caller;
+
   const apiKey = auroraApiKey();
   if (!apiKey) return NextResponse.json({ error: "Deposits from other networks are not configured" }, { status: 503 });
 
@@ -16,6 +21,13 @@ export async function POST(request: NextRequest) {
     refundModeFrom(process.env.NEXT_PUBLIC_INTENTS_REFUND_MODE)
   );
   if (!quoteRequest) return NextResponse.json({ error: "Invalid quote request" }, { status: 400 });
+
+  if (caller.userId) {
+    const wallet = await userWalletAddress(caller.userId);
+    if (!wallet || wallet.toLowerCase() !== quoteRequest.recipient.toLowerCase()) {
+      return NextResponse.json({ error: "Recipient must be your own wallet" }, { status: 403 });
+    }
+  }
 
   try {
     const response = await fetch(auroraUrl("quote", apiKey), {
