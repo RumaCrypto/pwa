@@ -1,5 +1,6 @@
 import "server-only";
 import { PrivyClient } from "@privy-io/node";
+import { ownsWallet } from "./wallets";
 
 let client: PrivyClient | null = null;
 
@@ -15,14 +16,8 @@ export async function verifyPrivyToken(token: string): Promise<{ userId: string 
   return { userId: claims.user_id };
 }
 
-/**
- * The quote route checks the deposit lands in the caller's own wallet, not someone else's.
- * Mirrors the client's `user.wallet`: the first Ethereum wallet linked to the user.
- */
-export async function userWalletAddress(userId: string): Promise<string | null> {
+/** The quote route checks the deposit lands in one of the caller's own wallets, not someone else's. */
+export async function userOwnsWallet(userId: string, address: string): Promise<boolean> {
   const user = await privy().users()._get(userId);
-  for (const account of user.linked_accounts) {
-    if (account.type === "wallet" && account.chain_type === "ethereum") return account.address;
-  }
-  return null;
+  return ownsWallet(user.linked_accounts, address);
 }

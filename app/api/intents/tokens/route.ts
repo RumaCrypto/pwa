@@ -8,7 +8,7 @@ const FETCH_TIMEOUT_MS = 8000;
 
 /** The token list changes rarely; caching it spares Aurora's per-key rate limit. */
 export async function GET(request: NextRequest) {
-  const caller = await intentsGuard(request);
+  const caller = await intentsGuard(request, "tokens");
   if (caller instanceof Response) return caller;
 
   const apiKey = auroraApiKey();

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auroraApiKey, auroraUrl } from "@/lib/intents/aurora";
 import { intentsGuard } from "@/lib/intents/guard";
-import { userWalletAddress } from "@/lib/intents/privy-server";
+import { userOwnsWallet } from "@/lib/intents/privy-server";
 import { refundModeFrom, validateQuoteRequest } from "@/lib/intents/quote";
 
 export const runtime = "nodejs";
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 const FETCH_TIMEOUT_MS = 20000;
 
 export async function POST(request: NextRequest) {
-  const caller = await intentsGuard(request);
+  const caller = await intentsGuard(request, "quote");
   if (caller instanceof Response) return caller;
 
   const apiKey = auroraApiKey();
@@ -23,10 +23,13 @@ export async function POST(request: NextRequest) {
   if (!quoteRequest) return NextResponse.json({ error: "Invalid quote request" }, { status: 400 });
 
   if (caller.userId) {
-    const wallet = await userWalletAddress(caller.userId);
-    if (!wallet || wallet.toLowerCase() !== quoteRequest.recipient.toLowerCase()) {
-      return NextResponse.json({ error: "Recipient must be your own wallet" }, { status: 403 });
+    let owns: boolean;
+    try {
+      owns = await userOwnsWallet(caller.userId, quoteRequest.recipient);
+    } catch {
+      return NextResponse.json({ error: "Could not verify wallet" }, { status: 502 });
     }
+    if (!owns) return NextResponse.json({ error: "Recipient must be your own wallet" }, { status: 403 });
   }
 
   try {

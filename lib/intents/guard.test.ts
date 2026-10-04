@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createMemoryLimiter, guardRequest, readGuardConfig, type GuardConfig } from "./guard";
 
 describe("readGuardConfig", () => {
-  it("requires a session and limits to 10 per minute by default", () => {
-    expect(readGuardConfig({})).toEqual({ authRequired: true, rateLimit: { limit: 10, windowMs: 60_000 } });
+  it("requires a session and limits to 30 per minute by default", () => {
+    expect(readGuardConfig({})).toEqual({ authRequired: true, rateLimit: { limit: 30, windowMs: 60_000 } });
   });
 
   it("reads both settings from env", () => {
@@ -15,7 +15,15 @@ describe("readGuardConfig", () => {
 
   it("turns the limit off with 'off' and falls back to the default on garbage", () => {
     expect(readGuardConfig({ INTENTS_RATE_LIMIT: "off" }).rateLimit).toBeNull();
-    expect(readGuardConfig({ INTENTS_RATE_LIMIT: "lots" }).rateLimit).toEqual({ limit: 10, windowMs: 60_000 });
+    expect(readGuardConfig({ INTENTS_RATE_LIMIT: "lots" }).rateLimit).toEqual({ limit: 30, windowMs: 60_000 });
+  });
+});
+
+describe("readGuardConfig zero values", () => {
+  it("falls back to the default on a zero limit or window", () => {
+    for (const raw of ["5/0", "0/60", "0/0"]) {
+      expect(readGuardConfig({ INTENTS_RATE_LIMIT: raw }).rateLimit).toEqual({ limit: 30, windowMs: 60_000 });
+    }
   });
 });
 

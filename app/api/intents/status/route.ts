@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 const FETCH_TIMEOUT_MS = 8000;
 
 export async function GET(request: NextRequest) {
-  const caller = await intentsGuard(request);
+  const caller = await intentsGuard(request, "status");
   if (caller instanceof Response) return caller;
 
   const apiKey = auroraApiKey();

@@ -3,7 +3,7 @@ export interface GuardConfig {
   rateLimit: { limit: number; windowMs: number } | null;
 }
 
-const DEFAULT_RATE_LIMIT = { limit: 10, windowMs: 60_000 };
+const DEFAULT_RATE_LIMIT = { limit: 30, windowMs: 60_000 };
 
 /**
  * The /api/intents routes spend our Aurora key, so by default only signed-in
@@ -16,7 +16,9 @@ export function readGuardConfig(env: Record<string, string | undefined> = proces
   if (raw === "off") rateLimit = null;
   else if (raw) {
     const match = /^(\d+)\/(\d+)$/.exec(raw);
-    if (match) rateLimit = { limit: Number(match[1]), windowMs: Number(match[2]) * 1000 };
+    const limit = match ? Number(match[1]) : 0;
+    const seconds = match ? Number(match[2]) : 0;
+    if (limit > 0 && seconds > 0) rateLimit = { limit, windowMs: seconds * 1000 };
   }
 
   return { authRequired: env.INTENTS_AUTH_REQUIRED !== "false", rateLimit };
@@ -93,12 +95,20 @@ async function buildLimiter(rateLimit: NonNullable<GuardConfig["rateLimit"]>): P
   return createMemoryLimiter(rateLimit.limit, rateLimit.windowMs);
 }
 
-export async function intentsGuard(request: Request): Promise<Caller | Response> {
+export type IntentsRoute = "tokens" | "quote" | "status";
+
+/** Limits are counted per route, so status polling does not eat the quote budget. */
+export async function intentsGuard(request: Request, route: IntentsRoute): Promise<Caller | Response> {
   const config = readGuardConfig();
+  if (config.authRequired && (!process.env.PRIVY_APP_SECRET || !process.env.NEXT_PUBLIC_PRIVY_APP_ID)) {
+    return deny(503, "Session check is not configured");
+  }
   if (sharedLimiter === undefined) {
     sharedLimiter = config.rateLimit ? await buildLimiter(config.rateLimit) : null;
   }
   // Imported lazily so tests of guardRequest never load the Privy SDK.
   const { verifyPrivyToken } = await import("./privy-server");
-  return guardRequest(request, { config, verify: verifyPrivyToken, limiter: sharedLimiter });
+  const shared = sharedLimiter;
+  const limiter: Limiter | null = shared ? (key) => shared(`${route}:${key}`) : null;
+  return guardRequest(request, { config, verify: verifyPrivyToken, limiter });
 }
