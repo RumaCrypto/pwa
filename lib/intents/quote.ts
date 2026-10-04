@@ -1,0 +1,142 @@
+import { isAddress, parseUnits } from "viem";
+import { USDC_BASE_ASSET_ID, type DepositAsset } from "./networks";
+
+/** 1%. People top up from exchanges that shave fees off, so the exact amount rarely arrives. */
+export const DEPOSIT_SLIPPAGE_BPS = 100;
+/** How long the one-time address accepts a deposit before Aurora starts refunding. */
+export const DEPOSIT_WINDOW_MS = 60 * 60 * 1000;
+
+export interface QuoteRequest {
+  dry: false;
+  swapType: "FLEX_INPUT";
+  slippageTolerance: number;
+  originAsset: string;
+  depositType: "ORIGIN_CHAIN";
+  destinationAsset: string;
+  amount: string;
+  recipient: string;
+  recipientType: "DESTINATION_CHAIN";
+  refundTo: string;
+  refundType: "ORIGIN_CHAIN" | "INTENTS";
+  deadline: string;
+}
+
+export type RefundMode = "origin" | "intents";
+export type Refund = { type: "ORIGIN_CHAIN"; address: string } | { type: "INTENTS" };
+
+/** Origin-chain refunds are the default: they return funds where the user can see them without help. */
+export function refundModeFrom(value: string | undefined): RefundMode {
+  return value === "intents" ? "intents" : "origin";
+}
+
+export interface QuoteResult {
+  depositAddress: string;
+  /** Only memo chains (e.g. Stellar) set this; none of ours do today. */
+  depositMemo?: string;
+  amountInFormatted: string;
+  minAmountIn: string;
+  amountOutFormatted: string;
+  minAmountOut: string;
+  deadline: string;
+  /** Seconds Aurora expects the swap to take once the deposit lands. */
+  timeEstimate: number;
+}
+
+const AMOUNT_PATTERN = /^\d+(\.\d+)?$/;
+
+export function parseAmount(text: string, decimals: number): bigint | null {
+  const normalised = text.trim().replace(",", ".");
+  if (!AMOUNT_PATTERN.test(normalised)) return null;
+
+  const fraction = normalised.split(".")[1] ?? "";
+  if (fraction.length > decimals) return null;
+
+  const amount = parseUnits(normalised, decimals);
+  return amount > 0n ? amount : null;
+}
+
+/**
+ * FLEX_INPUT rather than EXACT_INPUT: the amount works as a floor, so a deposit
+ * above it (or a little below) still converts instead of being refunded. In
+ * intents mode, refunds go to the user's NEAR Intents account, whose implicit
+ * id is their EVM address lowercased.
+ */
+export function buildQuoteRequest({
+  asset,
+  amount,
+  recipient,
+  refund,
+  now,
+}: {
+  asset: DepositAsset;
+  amount: bigint;
+  recipient: `0x${string}`;
+  refund: Refund;
+  now: Date;
+}): QuoteRequest {
+  return {
+    dry: false,
+    swapType: "FLEX_INPUT",
+    slippageTolerance: DEPOSIT_SLIPPAGE_BPS,
+    originAsset: asset.assetId,
+    depositType: "ORIGIN_CHAIN",
+    destinationAsset: USDC_BASE_ASSET_ID,
+    amount: amount.toString(),
+    recipient,
+    recipientType: "DESTINATION_CHAIN",
+    refundTo: refund.type === "INTENTS" ? recipient.toLowerCase() : refund.address.trim(),
+    refundType: refund.type,
+    deadline: new Date(now.getTime() + DEPOSIT_WINDOW_MS).toISOString(),
+  };
+}
+
+/**
+ * The quote route forwards to Aurora with our API key and fee settings, so it
+ * only lets through the one shape this app sends: a deposit that ends as USDC
+ * on Base in an EVM address.
+ */
+export function validateQuoteRequest(body: unknown, mode: RefundMode): QuoteRequest | null {
+  if (!body || typeof body !== "object") return null;
+  const r = body as Record<string, unknown>;
+
+  const refundOk =
+    mode === "intents"
+      ? r.refundType === "INTENTS" && typeof r.recipient === "string" && r.refundTo === r.recipient.toLowerCase()
+      : r.refundType === "ORIGIN_CHAIN" && typeof r.refundTo === "string" && r.refundTo.trim() !== "";
+
+  const ok =
+    r.dry === false &&
+    r.swapType === "FLEX_INPUT" &&
+    r.depositType === "ORIGIN_CHAIN" &&
+    r.destinationAsset === USDC_BASE_ASSET_ID &&
+    r.recipientType === "DESTINATION_CHAIN" &&
+    refundOk &&
+    r.slippageTolerance === DEPOSIT_SLIPPAGE_BPS &&
+    typeof r.originAsset === "string" &&
+    typeof r.amount === "string" &&
+    /^\d+$/.test(r.amount) &&
+    typeof r.recipient === "string" &&
+    isAddress(r.recipient) &&
+    typeof r.deadline === "string" &&
+    !Number.isNaN(Date.parse(r.deadline));
+
+  return ok ? (r as unknown as QuoteRequest) : null;
+}
+
+export function parseQuoteResponse(body: unknown): QuoteResult {
+  const quote = (body as { quote?: Record<string, unknown> } | null)?.quote;
+  if (!quote || typeof quote.depositAddress !== "string" || !quote.depositAddress) {
+    throw new Error("Aurora returned no deposit address");
+  }
+
+  return {
+    depositAddress: quote.depositAddress,
+    depositMemo: typeof quote.depositMemo === "string" ? quote.depositMemo : undefined,
+    amountInFormatted: String(quote.amountInFormatted),
+    minAmountIn: String(quote.minAmountIn),
+    amountOutFormatted: String(quote.amountOutFormatted),
+    minAmountOut: String(quote.minAmountOut),
+    deadline: String(quote.deadline),
+    timeEstimate: Number(quote.timeEstimate),
+  };
+}
