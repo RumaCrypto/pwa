@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   findActiveWithdrawal,
   getWithdrawal,
+  isOwnIntentAddress,
   isWithdrawalSettled,
   saveWithdrawal,
   updateWithdrawal,
@@ -129,5 +130,30 @@ describe("isWithdrawalSettled", () => {
   it("is settled when Aurora is done or nothing was sent", () => {
     expect(["completed", "refunded", "failed", "transfer_failed"].every((p) => isWithdrawalSettled(p as never))).toBe(true);
     expect(["awaiting_transfer", "awaiting_deposit", "processing"].some((p) => isWithdrawalSettled(p as never))).toBe(false);
+  });
+});
+
+describe("isOwnIntentAddress", () => {
+  const ADDR = "0x9F3A00000000000000000000000000000000C21E";
+
+  it("matches a stored deposit or withdrawal address, ignoring case and spaces", () => {
+    const storage = memoryStorage();
+    storage.setItem("ruma-intent-deposits", JSON.stringify({ [ADDR]: { depositAddress: ADDR } }));
+    storage.setItem("ruma-intent-withdrawals", JSON.stringify({ "0xabc": { depositAddress: "0xAbC0000000000000000000000000000000000001" } }));
+    expect(isOwnIntentAddress(storage, ` ${ADDR.toLowerCase()} `)).toBe(true);
+    expect(isOwnIntentAddress(storage, "0xabc0000000000000000000000000000000000001")).toBe(true);
+    expect(isOwnIntentAddress(storage, "0x5aeda56215b167893e80b4fe645ba6d5bab767de")).toBe(false);
+    expect(isOwnIntentAddress(storage, "  ")).toBe(false);
+  });
+
+  it("tolerates missing or garbage storage", () => {
+    const storage = memoryStorage();
+    expect(isOwnIntentAddress(storage, ADDR)).toBe(false);
+    storage.setItem("ruma-intent-deposits", "{not json");
+    storage.setItem("ruma-intent-withdrawals", JSON.stringify({ a: null, b: 5, c: { depositAddress: 7 } }));
+    expect(isOwnIntentAddress(storage, ADDR)).toBe(false);
+    storage.setItem("ruma-intent-deposits", "null");
+    storage.setItem("ruma-intent-withdrawals", "[1]");
+    expect(isOwnIntentAddress(storage, ADDR)).toBe(false);
   });
 });

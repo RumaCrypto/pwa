@@ -15,6 +15,11 @@ describe("nearAccountExists", () => {
     expect(await nearAccountExists("ghost.near", rpc({ error: { cause: { name: "UNKNOWN_ACCOUNT" } } }) as never)).toBe(false);
   });
 
+  it("only counts a result with an amount as an existing account", async () => {
+    await expect(nearAccountExists("alice.near", rpc({ result: { error: "unknown account" } }) as never)).rejects.toThrow();
+    await expect(nearAccountExists("alice.near", rpc({ result: {} }) as never)).rejects.toThrow();
+  });
+
   it("throws when the RPC cannot answer, rather than guessing", async () => {
     await expect(nearAccountExists("alice.near", rpc({ error: { cause: { name: "TIMEOUT_ERROR" } } }) as never)).rejects.toThrow();
     await expect(nearAccountExists("alice.near", rpc({}, 503) as never)).rejects.toThrow();

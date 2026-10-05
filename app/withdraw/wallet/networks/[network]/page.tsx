@@ -23,6 +23,7 @@ import { WITHDRAW_FEE, maxWithdrawable } from "@/lib/intents/fee";
 import { fetchTokens } from "@/lib/intents/api";
 import { errorKey } from "@/lib/intents/errors";
 import { saveDraft } from "@/lib/intents/withdraw-draft";
+import { isOwnIntentAddress } from "@/lib/intents/withdrawals";
 import { useWithdrawEstimate } from "@/lib/intents/use-withdraw-estimate";
 
 export default function WithdrawNetworkPage() {
@@ -67,11 +68,14 @@ function WithdrawForm({ network }: { network: Network }) {
   const trimmed = recipient.trim();
   const addressValid = isValidNetworkAddress(network.id, trimmed);
   const isOwnAddress = !!owner && trimmed.toLowerCase() === owner.toLowerCase();
+  // Sending to one of our own one-time deposit addresses would feed Aurora, not a wallet of theirs (S2).
+  // trimmed is empty on the server render, so localStorage is only read in the browser.
+  const isOwnDeposit = trimmed !== "" && isOwnIntentAddress(localStorage, trimmed);
   const max = balance === null ? null : maxWithdrawable(parseUnits(balance, USDC_DECIMALS), WITHDRAW_FEE);
   const amount = parseAmount(amountText, USDC_DECIMALS);
   const tooMuch = amount !== null && max !== null && amount > max;
   const refundTo = owner && isAddress(owner) ? owner : null;
-  const ready = asset && max !== null && addressValid && !isOwnAddress && amount && !tooMuch && refundTo;
+  const ready = asset && max !== null && addressValid && !isOwnAddress && !isOwnDeposit && amount && !tooMuch && refundTo;
 
   const { estimate, loading, error: estimateError } = useWithdrawEstimate(
     ready ? { asset: asset!, recipient: trimmed, amount: amount!, refundTo: refundTo! } : null
@@ -98,7 +102,7 @@ function WithdrawForm({ network }: { network: Network }) {
   };
 
   const addressHint =
-    trimmed && !addressValid
+    (trimmed && !addressValid) || isOwnDeposit
       ? t("withdrawFlow.form.invalidAddress", { network: network.name })
       : isOwnAddress
         ? t("withdrawFlow.form.ownAddress")

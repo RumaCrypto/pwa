@@ -27,7 +27,7 @@ import { requestWithdrawQuote, submitDepositTx } from "@/lib/intents/api";
 import { errorKey, withdrawErrorKey } from "@/lib/intents/errors";
 import { WithdrawError } from "@/lib/intents/withdraw-errors";
 import { clearDraft, readDraft, type WithdrawDraft } from "@/lib/intents/withdraw-draft";
-import { findActiveWithdrawal } from "@/lib/intents/withdrawals";
+import { findActiveWithdrawal, isOwnIntentAddress, type IntentWithdrawal } from "@/lib/intents/withdrawals";
 import { executeWithdrawal } from "@/lib/intents/withdraw-execution";
 
 export default function WithdrawReviewPage() {
@@ -49,6 +49,8 @@ function WithdrawReview() {
   const [error, setError] = useState<unknown>(null);
   // Terminal: the transfer may have left but no record exists, so this screen must never offer a retry.
   const [unconfirmed, setUnconfirmed] = useState(false);
+  // The recipient is one of the user's own one-time deposit addresses (S2); nothing was requested.
+  const [ownRecipient, setOwnRecipient] = useState(false);
   // A ref, not state: a second tap in the same frame must already see the lock (S4).
   const locked = useRef(false);
 
@@ -82,9 +84,16 @@ function WithdrawReview() {
     setBusy(true);
     setError(null);
     setChanged(false);
+    setOwnRecipient(false);
     // Stays true after a navigation or a terminal state, so the screen can't be used again.
     let keepLocked = false;
+    let withdrawal: IntentWithdrawal | null = null;
     try {
+      if (isOwnIntentAddress(localStorage, draft.recipient)) {
+        setOwnRecipient(true);
+        return;
+      }
+
       const active = findActiveWithdrawal(localStorage, new Date());
       if (active) {
         keepLocked = true;
@@ -111,7 +120,7 @@ function WithdrawReview() {
       }
 
       const { walletClient, address } = await getWalletClient();
-      const withdrawal = await executeWithdrawal(
+      withdrawal = await executeWithdrawal(
         { request, quote, asset: draft.asset, confirmedAmount: amount, fee: WITHDRAW_FEE },
         {
           storage: localStorage,
@@ -131,9 +140,8 @@ function WithdrawReview() {
           submitTx: (hash, depositAddress) => submitDepositTx(hash, depositAddress, token),
         }
       );
-      clearDraft(sessionStorage);
+      // Money has left: from here nothing may be reported as a failure to retry.
       keepLocked = true;
-      router.replace(`/withdraw/wallet/track/${encodeURIComponent(withdrawal.depositAddress)}`);
     } catch (err) {
       // Money may have left: the track screen finds out from Aurora.
       if (err instanceof WithdrawError && err.code === "unconfirmed") {
@@ -154,10 +162,22 @@ function WithdrawReview() {
         setBusy(false);
       }
     }
+
+    // Outside the try above, whose catch maps errors to "Something went wrong": the transfer already went out.
+    if (withdrawal) {
+      try {
+        clearDraft(sessionStorage);
+      } catch {
+        // A stale draft is harmless; the track screen is what matters now.
+      }
+      router.replace(`/withdraw/wallet/track/${encodeURIComponent(withdrawal.depositAddress)}`);
+    }
   };
 
   const key = error == null ? null : (withdrawErrorKey(error) ?? errorKey(error));
-  const errorText = error == null ? null : key ? t(key) : error instanceof Error ? error.message : String(error);
+  const errorText = ownRecipient
+    ? t("withdrawFlow.errors.recipient")
+    : error == null ? null : key ? t(key) : error instanceof Error ? error.message : String(error);
   const minimum = formatUnits(BigInt(shown.minAmountOut), draft.asset.decimals);
 
   return (

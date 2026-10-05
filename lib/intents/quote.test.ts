@@ -1,3 +1,4 @@
+import { getAddress } from "viem";
 import { describe, expect, it } from "vitest";
 import {
   DEPOSIT_SLIPPAGE_BPS,
@@ -304,6 +305,14 @@ describe("parseWithdrawEstimate", () => {
   it("fails loudly when amounts are missing", () => {
     expect(() => parseWithdrawEstimate({ quote: { timeEstimate: 1 } })).toThrow();
   });
+
+  it("rejects amounts that are not plain integers", () => {
+    for (const field of ["amountOut", "minAmountOut"] as const) {
+      for (const bad of ["49.82", "-1", "1e6", "", "abc"]) {
+        expect(() => parseWithdrawEstimate({ quote: { ...QUOTE_BODY.quote, [field]: bad } })).toThrow(/invalid/);
+      }
+    }
+  });
 });
 
 describe("parseWithdrawQuote", () => {
@@ -322,6 +331,28 @@ describe("parseWithdrawQuote", () => {
     }
   });
 
+  it("accepts an EVM address echoed in another case, but not a different one", () => {
+    const checksummed = getAddress(OWNER);
+    const sent = withdrawal();
+    expect(parseWithdrawQuote({ ...QUOTE_BODY, quoteRequest: { ...sent, refundTo: checksummed } }, sent)).toBeTruthy();
+    const other = getAddress("0x5aeda56215b167893e80b4fe645ba6d5bab767de");
+    expect(() => parseWithdrawQuote({ ...QUOTE_BODY, quoteRequest: { ...sent, refundTo: other } }, sent)).toThrow(WithdrawError);
+    expect(() => parseWithdrawQuote({ ...QUOTE_BODY, quoteRequest: { ...sent, refundTo: "not-an-address" } }, sent)).toThrow(WithdrawError);
+  });
+
+  it("compares an EVM recipient case-insensitively and a non-EVM one exactly", () => {
+    const evmSent = { ...withdrawal(), recipient: OWNER };
+    expect(parseWithdrawQuote({ ...QUOTE_BODY, quoteRequest: { ...evmSent, recipient: getAddress(OWNER) } }, evmSent)).toBeTruthy();
+    const sent = withdrawal();
+    expect(() => parseWithdrawQuote({ ...QUOTE_BODY, quoteRequest: { ...sent, recipient: TRON_TO.toLowerCase() } }, sent)).toThrow(WithdrawError);
+  });
+
+  it("refuses an amountIn that is not a plain integer", () => {
+    const sent = { ...withdrawal(), amount: "5e7" };
+    const body = { quoteRequest: sent, quote: { ...QUOTE_BODY.quote, amountIn: "5e7" } };
+    expect(() => parseWithdrawQuote(body, sent)).toThrow(WithdrawError);
+  });
+
   it("refuses an amountIn that differs from the request, or a deposit address that is not on Base", () => {
     expect(() => parseWithdrawQuote({ ...QUOTE_BODY, quote: { ...QUOTE_BODY.quote, amountIn: "50000001" } }, withdrawal())).toThrow(WithdrawError);
     expect(() => parseWithdrawQuote({ ...QUOTE_BODY, quote: { ...QUOTE_BODY.quote, depositAddress: TRON_TO } }, withdrawal())).toThrow(WithdrawError);
@@ -334,7 +365,12 @@ describe("quoteStillHolds", () => {
   it("holds while the live amount out is at least the minimum the user was shown", () => {
     const quote = parseWithdrawQuote(QUOTE_BODY, withdrawal());
     expect(quoteStillHolds(shown, quote)).toBe(true);
-    expect(quoteStillHolds(shown, { ...quote, amountOut: "49321799" })).toBe(false);
+    expect(quoteStillHolds(shown, { ...quote, minAmountOut: "49321799" })).toBe(false);
+  });
+
+  it("asks again when the enforced minimum drops below the one shown, even if the expected amount is fine", () => {
+    const quote = parseWithdrawQuote(QUOTE_BODY, withdrawal());
+    expect(quoteStillHolds(shown, { ...quote, amountOut: "49900000", minAmountOut: "49321799" })).toBe(false);
   });
 });
 

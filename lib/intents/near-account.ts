@@ -26,7 +26,7 @@ export async function nearAccountExists(accountId: string, fetchImpl: typeof fet
   if (!response.ok) throw new Error(`NEAR RPC answered ${response.status}`);
 
   const body = (await response.json()) as { result?: unknown; error?: { cause?: { name?: unknown } } };
-  if (body.result) return true;
+  if (typeof (body.result as { amount?: unknown } | undefined)?.amount === "string") return true;
   if (body.error?.cause?.name === "UNKNOWN_ACCOUNT") return false;
   throw new Error(`NEAR RPC error: ${String(body.error?.cause?.name ?? "unknown")}`);
 }

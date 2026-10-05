@@ -1,4 +1,4 @@
-import { isAddress, parseUnits } from "viem";
+import { getAddress, isAddress, parseUnits } from "viem";
 import { USDC_BASE_ASSET_ID, type DepositAsset, type WithdrawAsset } from "./networks";
 import { isValidNetworkAddress } from "./addresses";
 import { WithdrawError } from "./withdraw-errors";
@@ -330,6 +330,10 @@ export function parseWithdrawEstimate(body: unknown): WithdrawEstimate {
   for (const field of ["amountOut", "amountOutFormatted", "minAmountOut"] as const) {
     if (typeof quote[field] !== "string") throw new Error(`Aurora returned no ${field}`);
   }
+  // These feed BigInt() later; a non-integer would throw there or compare wrongly.
+  for (const field of ["amountOut", "minAmountOut"] as const) {
+    if (!/^\d+$/.test(quote[field] as string)) throw new Error(`Aurora returned an invalid ${field}`);
+  }
   if (typeof quote.timeEstimate !== "number" || !Number.isFinite(quote.timeEstimate)) {
     throw new Error("Aurora returned an invalid timeEstimate");
   }
@@ -346,6 +350,24 @@ export function parseWithdrawEstimate(body: unknown): WithdrawEstimate {
 
 const ECHOED_FIELDS = ["originAsset", "destinationAsset", "amount", "recipient", "refundTo"] as const;
 
+function sameEvmAddress(a: unknown, b: string): boolean {
+  if (typeof a !== "string") return false;
+  try {
+    return getAddress(a) === getAddress(b);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Aurora may echo an EVM address in another case (e.g. checksummed), which is
+ * the same address; everything else must match exactly.
+ */
+function echoMatches(field: (typeof ECHOED_FIELDS)[number], echoed: unknown, sent: WithdrawQuoteRequest): boolean {
+  const isEvmField = field === "refundTo" || (field === "recipient" && isAddress(sent.recipient));
+  return isEvmField ? sameEvmAddress(echoed, sent[field]) : echoed === sent[field];
+}
+
 /**
  * The live quote decides where the user's money goes, so before anything is
  * signed it must be for exactly what was asked: Aurora echoes the request, and
@@ -354,12 +376,12 @@ const ECHOED_FIELDS = ["originAsset", "destinationAsset", "amount", "recipient",
  */
 export function parseWithdrawQuote(body: unknown, sent: WithdrawQuoteRequest): WithdrawQuote {
   const echoed = (body as { quoteRequest?: Record<string, unknown> } | null)?.quoteRequest;
-  if (!echoed || ECHOED_FIELDS.some((field) => echoed[field] !== sent[field])) throw new WithdrawError("mismatch");
+  if (!echoed || ECHOED_FIELDS.some((field) => !echoMatches(field, echoed[field], sent))) throw new WithdrawError("mismatch");
 
   const estimate = parseWithdrawEstimate(body);
   const quote = quoteObject(body);
   if (typeof quote.depositAddress !== "string" || !isAddress(quote.depositAddress)) throw new WithdrawError("mismatch");
-  if (quote.amountIn !== sent.amount) throw new WithdrawError("mismatch");
+  if (typeof quote.amountIn !== "string" || !/^\d+$/.test(quote.amountIn) || quote.amountIn !== sent.amount) throw new WithdrawError("mismatch");
   if (typeof quote.amountInFormatted !== "string") throw new Error("Aurora returned no amountInFormatted");
   if (typeof quote.deadline !== "string" || Number.isNaN(Date.parse(quote.deadline))) {
     throw new Error("Aurora returned an invalid deadline");
@@ -376,11 +398,11 @@ export function parseWithdrawQuote(body: unknown, sent: WithdrawQuoteRequest): W
 
 /**
  * The live quote is fetched on confirm, a moment after the user read the
- * estimate. It is signed without asking again only if what it expects to
- * deliver is still at least the minimum the user was shown.
+ * estimate. It is signed without asking again only if the minimum it now
+ * enforces is at least the "Guaranteed minimum" the user read.
  */
 export function quoteStillHolds(shown: WithdrawEstimate, quote: WithdrawQuote): boolean {
-  return BigInt(quote.amountOut) >= BigInt(shown.minAmountOut);
+  return BigInt(quote.minAmountOut) >= BigInt(shown.minAmountOut);
 }
 
 /** Network and conversion cost in dollars, as Aurora prices both sides. Null when it did not say. */

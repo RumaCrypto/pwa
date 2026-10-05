@@ -61,6 +61,13 @@ describe("isValidNetworkAddress on Bitcoin", () => {
     expect(isValidNetworkAddress("btc", taproot.toUpperCase())).toBe(true);
   });
 
+  it("accepts only v0 (20 or 32 bytes) and v1 with a 32-byte program", () => {
+    expect(isValidNetworkAddress("btc", bech32m.encode("bc", [1, ...bech32m.toWords(bytes(20, 9))]))).toBe(false);
+    expect(isValidNetworkAddress("btc", bech32m.encode("bc", [2, ...bech32m.toWords(bytes(32, 9))]))).toBe(false);
+    expect(isValidNetworkAddress("btc", bech32m.encode("bc", [16, ...bech32m.toWords(bytes(32, 9))]))).toBe(false);
+    expect(isValidNetworkAddress("btc", bech32.encode("bc", [0, ...bech32.toWords(bytes(25, 7))]))).toBe(false);
+  });
+
   it("rejects broken checksums, the wrong checksum variant, testnet and mixed case", () => {
     expect(isValidNetworkAddress("btc", breakChecksum("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", BASE58))).toBe(false);
     expect(isValidNetworkAddress("btc", breakChecksum(segwitV0, BECH32))).toBe(false);

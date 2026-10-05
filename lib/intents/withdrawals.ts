@@ -132,3 +132,27 @@ export function withdrawalPhaseFor(stored: WithdrawalPhase, status: IntentStatus
   if (stored === "awaiting_transfer" && status === "PENDING_DEPOSIT") return "awaiting_transfer";
   return phaseFor(status);
 }
+
+const DEPOSITS_KEY = "ruma-intent-deposits";
+
+/**
+ * True when the address is one of the user's own one-time deposit addresses
+ * (from a top-up or an earlier withdrawal): sending there would credit
+ * Aurora's swap, not a wallet the user controls.
+ */
+export function isOwnIntentAddress(storage: Pick<DepositStorage, "getItem">, address: string): boolean {
+  const wanted = address.trim().toLowerCase();
+  if (!wanted) return false;
+  return [DEPOSITS_KEY, WITHDRAWALS_KEY].some((key) => {
+    try {
+      const parsed: unknown = JSON.parse(storage.getItem(key) ?? "{}");
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+      return Object.values(parsed).some((entry) => {
+        const stored = (entry as { depositAddress?: unknown } | null)?.depositAddress;
+        return typeof stored === "string" && stored.toLowerCase() === wanted;
+      });
+    } catch {
+      return false;
+    }
+  });
+}

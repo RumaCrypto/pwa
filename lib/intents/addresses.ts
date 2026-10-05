@@ -50,7 +50,8 @@ function isBitcoinSegwit(address: string): boolean {
     const [version, ...data] = words;
     const program = coder.fromWords(data);
     if (isV0) return version === 0 && (program.length === 20 || program.length === 32);
-    return version >= 1 && version <= 16 && program.length >= 2 && program.length <= 40;
+    // Only Taproot (v1, 32 bytes) is defined beyond v0; later versions are unspendable today.
+    return version === 1 && program.length === 32;
   } catch {
     return false;
   }
