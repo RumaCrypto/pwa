@@ -1,5 +1,3 @@
-import { isAddress } from "viem";
-
 /**
  * Where a deposit can come from. Aurora Intents supports many more chains;
  * these are the ones the designs promise, kept short so the picker stays
@@ -87,24 +85,4 @@ export function assetsForNetwork(tokens: readonly IntentsToken[], network: Netwo
   }
 
   return assets;
-}
-
-const BASE58 = "[1-9A-HJ-NP-Za-km-z]";
-const REFUND_ADDRESS: Record<NetworkId, (address: string) => boolean> = {
-  eth: (a) => isAddress(a),
-  arb: (a) => isAddress(a),
-  op: (a) => isAddress(a),
-  tron: (a) => new RegExp(`^T${BASE58}{33}$`).test(a),
-  btc: (a) => /^bc1[02-9ac-hj-np-z]{11,71}$/.test(a) || new RegExp(`^[13]${BASE58}{25,34}$`).test(a),
-  // Implicit (64 hex) or named accounts, per NEAR's account id rules.
-  near: (a) => /^[0-9a-f]{64}$/.test(a) || /^(?=.{2,64}$)([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*$/.test(a),
-};
-
-/**
- * Format check only: it catches the common mistake of pasting an address from
- * the wrong network, where a refund would be unrecoverable. Aurora validates
- * again when quoting.
- */
-export function isValidRefundAddress(network: NetworkId, address: string): boolean {
-  return REFUND_ADDRESS[network](address.trim());
 }

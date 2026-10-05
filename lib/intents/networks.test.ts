@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NETWORKS, assetsForNetwork, findNetwork, isNetworkId, isValidRefundAddress, type IntentsToken } from "./networks";
+import { NETWORKS, assetsForNetwork, findNetwork, isNetworkId, type IntentsToken } from "./networks";
 
 const token = (blockchain: string, symbol: string, assetId: string, decimals = 6): IntentsToken => ({
   assetId,
@@ -55,25 +55,5 @@ describe("assetsForNetwork", () => {
 
   it("returns nothing when the API lists no asset for the network", () => {
     expect(assetsForNetwork(TOKENS, "op")).toEqual([]);
-  });
-});
-
-describe("isValidRefundAddress", () => {
-  it("accepts each network's own address format", () => {
-    expect(isValidRefundAddress("eth", "0x5aeda56215b167893e80b4fe645ba6d5bab767de")).toBe(true);
-    expect(isValidRefundAddress("arb", "0x5aeda56215b167893e80b4fe645ba6d5bab767de")).toBe(true);
-    expect(isValidRefundAddress("tron", "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t")).toBe(true);
-    expect(isValidRefundAddress("btc", "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq")).toBe(true);
-    expect(isValidRefundAddress("btc", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")).toBe(true);
-    expect(isValidRefundAddress("near", "alice.near")).toBe(true);
-    expect(isValidRefundAddress("near", "a".repeat(64))).toBe(true);
-  });
-
-  it("rejects an address from another network, where a refund would be lost", () => {
-    expect(isValidRefundAddress("tron", "0x5aeda56215b167893e80b4fe645ba6d5bab767de")).toBe(false);
-    expect(isValidRefundAddress("eth", "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t")).toBe(false);
-    expect(isValidRefundAddress("btc", "alice.near")).toBe(false);
-    expect(isValidRefundAddress("near", "Alice.NEAR")).toBe(false);
-    expect(isValidRefundAddress("eth", "  ")).toBe(false);
   });
 });

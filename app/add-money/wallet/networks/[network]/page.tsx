@@ -13,7 +13,8 @@ import { typography } from "@/constants/typography";
 
 import { FLAGS } from "@/lib/flags";
 import { useI18n } from "@/lib/i18n/i18n-context";
-import { assetsForNetwork, findNetwork, isNetworkId, isValidRefundAddress, type DepositAsset, type Network } from "@/lib/intents/networks";
+import { isValidNetworkAddress } from "@/lib/intents/addresses";
+import { assetsForNetwork, findNetwork, isNetworkId, type DepositAsset, type Network } from "@/lib/intents/networks";
 import { buildQuoteRequest, parseAmount, refundModeFrom, type Refund } from "@/lib/intents/quote";
 import { depositFromQuote, saveDeposit } from "@/lib/intents/deposits";
 import { fetchTokens, requestDepositQuote } from "@/lib/intents/api";
@@ -62,7 +63,7 @@ function AssetAndAmount({ network }: { network: Network }) {
 
   const asset = assets?.find((a) => a.assetId === assetId) ?? null;
   const amount = asset ? parseAmount(amountText, asset.decimals) : null;
-  const refundValid = REFUND_MODE === "intents" || isValidRefundAddress(network.id, refundAddress);
+  const refundValid = REFUND_MODE === "intents" || isValidNetworkAddress(network.id, refundAddress);
   const refund: Refund =
     REFUND_MODE === "intents" ? { type: "INTENTS" } : { type: "ORIGIN_CHAIN", address: refundAddress };
   const usdEstimate = useMemo(() => {
