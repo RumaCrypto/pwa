@@ -44,8 +44,14 @@ export interface DepositAsset {
   priceUsd: number;
 }
 
+export interface WithdrawAsset extends DepositAsset {
+  network: NetworkId;
+  /** Lets the server refuse a token contract as a recipient. */
+  contractAddress: string | null;
+}
+
 /**
- * Per network, the assets worth offering, in display order. The token list
+ * Per network, the assets worth offering for deposits, in display order. The token list
  * also carries long-tail and bridged assets (BTC on NEAR, memecoins) that would
  * only confuse someone topping up a dollar account.
  */
@@ -58,6 +64,19 @@ const ALLOWED_SYMBOLS: Record<NetworkId, readonly string[]> = {
   near: ["USDC", "USDT", "wNEAR"],
 };
 
+/**
+ * What a withdrawal can arrive as. Only stablecoins, plus BTC where no dollar
+ * token exists: someone cashing out of a dollar account expects dollars.
+ */
+const WITHDRAW_SYMBOLS: Record<NetworkId, readonly string[]> = {
+  eth: ["USDC", "USDT"],
+  arb: ["USDC", "USDT"],
+  op: ["USDC", "USDT"],
+  tron: ["USDT"],
+  btc: ["BTC"],
+  near: ["USDC", "USDT"],
+};
+
 const DISPLAY_SYMBOL: Record<string, string> = { wNEAR: "NEAR" };
 
 export function isNetworkId(value: string): value is NetworkId {
@@ -68,21 +87,37 @@ export function findNetwork(id: NetworkId): Network {
   return NETWORKS.find((network) => network.id === id)!;
 }
 
-export function assetsForNetwork(tokens: readonly IntentsToken[], network: NetworkId): DepositAsset[] {
-  const allowed = ALLOWED_SYMBOLS[network];
-  const assets: DepositAsset[] = [];
-
-  for (const symbol of allowed) {
+function pickTokens(tokens: readonly IntentsToken[], network: NetworkId, symbols: readonly string[]): IntentsToken[] {
+  const picked: IntentsToken[] = [];
+  for (const symbol of symbols) {
     // The first listing wins when a symbol appears twice on one chain.
     const token = tokens.find((t) => t.blockchain === network && t.symbol === symbol);
-    if (!token) continue;
-    assets.push({
-      assetId: token.assetId,
-      symbol: DISPLAY_SYMBOL[symbol] ?? symbol,
-      decimals: token.decimals,
-      priceUsd: token.price,
-    });
+    if (token) picked.push(token);
   }
+  return picked;
+}
 
-  return assets;
+export function assetsForNetwork(tokens: readonly IntentsToken[], network: NetworkId): DepositAsset[] {
+  return pickTokens(tokens, network, ALLOWED_SYMBOLS[network]).map((token) => ({
+    assetId: token.assetId,
+    symbol: DISPLAY_SYMBOL[token.symbol] ?? token.symbol,
+    decimals: token.decimals,
+    priceUsd: token.price,
+  }));
+}
+
+export function withdrawAssetsForNetwork(tokens: readonly IntentsToken[], network: NetworkId): WithdrawAsset[] {
+  return pickTokens(tokens, network, WITHDRAW_SYMBOLS[network]).map((token) => ({
+    assetId: token.assetId,
+    symbol: token.symbol,
+    decimals: token.decimals,
+    priceUsd: token.price,
+    network,
+    contractAddress: token.contractAddress,
+  }));
+}
+
+/** The server's allow-list for a withdrawal's destination, derived from Aurora's own token list. */
+export function allWithdrawAssets(tokens: readonly IntentsToken[]): WithdrawAsset[] {
+  return NETWORKS.flatMap((network) => withdrawAssetsForNetwork(tokens, network.id));
 }
