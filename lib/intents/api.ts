@@ -1,5 +1,14 @@
 import type { IntentsToken } from "./networks";
-import { parseQuoteResponse, type QuoteRequest, type QuoteResult } from "./quote";
+import {
+  parseQuoteResponse,
+  parseWithdrawEstimate,
+  parseWithdrawQuote,
+  type QuoteRequest,
+  type QuoteResult,
+  type WithdrawEstimate,
+  type WithdrawQuote,
+  type WithdrawQuoteRequest,
+} from "./quote";
 import { parseStatusResponse, type StatusResult } from "./status";
 
 /** Keeps the HTTP status so the screen can tell our own refusals from Aurora's messages. */
@@ -55,4 +64,41 @@ export async function fetchDepositStatus(
   const response = await fetchImpl(`/api/intents/status?${query}`, { headers: authHeaders(accessToken) });
   if (!response.ok) throw await errorFrom(response);
   return parseStatusResponse(await response.json());
+}
+
+async function postJson(url: string, body: unknown, accessToken: string | null, fetchImpl: typeof fetch, signal?: AbortSignal) {
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(accessToken) },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok) throw await errorFrom(response);
+  return response.json();
+}
+
+export async function requestWithdrawEstimate(
+  request: WithdrawQuoteRequest,
+  accessToken: string | null,
+  signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch
+): Promise<WithdrawEstimate> {
+  return parseWithdrawEstimate(await postJson("/api/intents/quote/dry", request, accessToken, fetchImpl, signal));
+}
+
+export async function requestWithdrawQuote(
+  request: WithdrawQuoteRequest,
+  accessToken: string | null,
+  fetchImpl: typeof fetch = fetch
+): Promise<WithdrawQuote> {
+  return parseWithdrawQuote(await postJson("/api/intents/quote", request, accessToken, fetchImpl), request);
+}
+
+export async function submitDepositTx(
+  txHash: string,
+  depositAddress: string,
+  accessToken: string | null,
+  fetchImpl: typeof fetch = fetch
+): Promise<void> {
+  await postJson("/api/intents/submit", { txHash, depositAddress }, accessToken, fetchImpl);
 }

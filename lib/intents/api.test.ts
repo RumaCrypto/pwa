@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { IntentsApiError, fetchDepositStatus, requestDepositQuote } from "./api";
+import {
+  IntentsApiError,
+  fetchDepositStatus,
+  requestDepositQuote,
+  requestWithdrawEstimate,
+  requestWithdrawQuote,
+  submitDepositTx,
+} from "./api";
 import type { QuoteRequest } from "./quote";
 
 const json = (status: number, body: unknown) =>
@@ -51,5 +58,31 @@ describe("fetchDepositStatus", () => {
     expect(fetchImpl).toHaveBeenCalledWith("/api/intents/status?depositAddress=TXyz", {
       headers: { Authorization: "Bearer tok" },
     });
+  });
+});
+
+describe("withdrawal calls", () => {
+  const request = { amount: "1", recipient: "r", refundTo: "0x1", originAsset: "o", destinationAsset: "d" } as never;
+  const ok = (body: unknown) => vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }));
+
+  it("asks the dry route for estimates and passes the abort signal", async () => {
+    const fetchImpl = ok({ quote: { amountOut: "1", amountOutFormatted: "1", minAmountOut: "1", timeEstimate: 1 } });
+    const signal = new AbortController().signal;
+    await requestWithdrawEstimate(request, "tok", signal, fetchImpl as never);
+    expect(fetchImpl).toHaveBeenCalledWith("/api/intents/quote/dry", expect.objectContaining({ method: "POST", signal }));
+  });
+
+  it("posts the tx hash and deposit address to the submit route", async () => {
+    const fetchImpl = ok({});
+    await submitDepositTx(`0x${"ab".repeat(32)}`, "0x9f3a00000000000000000000000000000000c21e", "tok", fetchImpl as never);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/api/intents/submit",
+      expect.objectContaining({ method: "POST", headers: expect.objectContaining({ Authorization: "Bearer tok" }) })
+    );
+  });
+
+  it("raises IntentsApiError with the status on refusal", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ error: "Recipient is a token contract" }), { status: 422 }));
+    await expect(requestWithdrawQuote(request, "tok", fetchImpl as never)).rejects.toMatchObject({ status: 422 });
   });
 });

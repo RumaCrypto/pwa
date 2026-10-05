@@ -1,11 +1,13 @@
 import { IntentsApiError } from "./api";
+import { WithdrawError, type WithdrawErrorCode } from "./withdraw-errors";
 
 export type IntentsErrorKey =
   | "intents.errors.session"
   | "intents.errors.wallet"
   | "intents.errors.rateLimit"
   | "intents.errors.unavailable"
-  | "intents.errors.generic";
+  | "intents.errors.generic"
+  | "withdrawFlow.errors.recipient";
 
 /** What the quote route answers when the body fails our own validation; the user can't fix that. */
 const INVALID_QUOTE_REQUEST = "Invalid quote request";
@@ -22,6 +24,8 @@ export function errorKey(err: unknown): IntentsErrorKey | null {
       return "intents.errors.session";
     case 403:
       return "intents.errors.wallet";
+    case 422:
+      return "withdrawFlow.errors.recipient";
     case 429:
       return "intents.errors.rateLimit";
     // 404 only comes from our routes when the feature flag is off.
@@ -32,4 +36,25 @@ export function errorKey(err: unknown): IntentsErrorKey | null {
   if (err.status === 400 && err.message === INVALID_QUOTE_REQUEST) return "intents.errors.generic";
   if (err.status >= 400 && err.status < 500) return null;
   return "intents.errors.generic";
+}
+
+export type WithdrawErrorKey =
+  | "withdrawFlow.errors.mismatch"
+  | "withdrawFlow.errors.expired"
+  | "withdrawFlow.errors.balance"
+  | "withdrawFlow.errors.rejected"
+  | "withdrawFlow.errors.reverted";
+
+const WITHDRAW_ERROR_KEYS: Record<Exclude<WithdrawErrorCode, "unconfirmed">, WithdrawErrorKey> = {
+  mismatch: "withdrawFlow.errors.mismatch",
+  expired: "withdrawFlow.errors.expired",
+  balance: "withdrawFlow.errors.balance",
+  rejected: "withdrawFlow.errors.rejected",
+  reverted: "withdrawFlow.errors.reverted",
+};
+
+/** Copy for a withdrawal that stopped before money moved. "unconfirmed" has none: the screen sends the user to tracking instead. */
+export function withdrawErrorKey(err: unknown): WithdrawErrorKey | null {
+  if (!(err instanceof WithdrawError) || err.code === "unconfirmed") return null;
+  return WITHDRAW_ERROR_KEYS[err.code];
 }
