@@ -50,6 +50,7 @@ describe("executeWithdrawal", () => {
     const withdrawal = await executeWithdrawal(input(), deps);
     expect(deps.transfer).toHaveBeenCalledWith(DEPOSIT, 50_000_000n);
     expect(deps.submitTx).toHaveBeenCalledWith(HASH, DEPOSIT);
+    expect(deps.transfer).toHaveBeenNthCalledWith(1, DEPOSIT, 50_000_000n);
     expect(withdrawal).toMatchObject({ phase: "awaiting_deposit", transferTxHash: HASH });
     expect(getWithdrawal(deps.storage, DEPOSIT)?.phase).toBe("awaiting_deposit");
   });
@@ -96,9 +97,42 @@ describe("executeWithdrawal", () => {
   });
 
   it("keeps it awaiting the transfer when it cannot tell whether it was broadcast", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const deps = setup({ transfer: vi.fn(async () => Promise.reject(new Error("socket hang up"))) });
     await expect(executeWithdrawal(input(), deps)).rejects.toMatchObject({ code: "unconfirmed" });
     expect(getWithdrawal(deps.storage, DEPOSIT)?.phase).toBe("awaiting_transfer");
+    error.mockRestore();
+  });
+
+  it.each(["TimeoutError", "HttpRequestError"])("treats viem's wrapper around a %s as unconfirmed, not unsent", async (name) => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const wrapped = Object.assign(new Error("wrapped"), { name: "ContractFunctionExecutionError", cause: { name } });
+    const deps = setup({ transfer: vi.fn(async () => Promise.reject(wrapped)) });
+    await expect(executeWithdrawal(input(), deps)).rejects.toMatchObject({ code: "unconfirmed" });
+    expect(getWithdrawal(deps.storage, DEPOSIT)?.phase).toBe("awaiting_transfer");
+    error.mockRestore();
+  });
+
+  it("reports unconfirmed when saving the hash fails after the transfer was signed", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const base = memoryStorage();
+    let broken = false;
+    const storage = {
+      getItem: base.getItem,
+      setItem: (k: string, v: string) => {
+        if (broken) throw new Error("quota");
+        base.setItem(k, v);
+      },
+    };
+    const deps = setup({
+      storage,
+      transfer: vi.fn(async () => {
+        broken = true;
+        return HASH;
+      }),
+    });
+    await expect(executeWithdrawal(input(), deps)).rejects.toMatchObject({ code: "unconfirmed" });
+    error.mockRestore();
   });
 
   it("marks it not sent when the transfer reverts on-chain", async () => {
@@ -107,10 +141,24 @@ describe("executeWithdrawal", () => {
     expect(getWithdrawal(deps.storage, DEPOSIT)?.phase).toBe("transfer_failed");
   });
 
+  it("does not charge the fee when the transfer reverts", async () => {
+    const deps = setup({ waitForReceipt: vi.fn(async () => ({ status: "reverted" as const })) });
+    await expect(executeWithdrawal(input({ fee: FEE }), deps)).rejects.toMatchObject({ code: "reverted" });
+    expect(deps.transfer).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the fee when it is enabled but has no treasury", async () => {
+    const deps = setup();
+    await executeWithdrawal(input({ fee: { enabled: true, amount: 100_000n, treasury: null } }), deps);
+    expect(deps.transfer).toHaveBeenCalledTimes(1);
+  });
+
   it("leaves it for tracking when the receipt never comes", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const deps = setup({ waitForReceipt: vi.fn(async () => Promise.reject(new Error("timeout"))) });
     await expect(executeWithdrawal(input(), deps)).rejects.toMatchObject({ code: "unconfirmed" });
     expect(getWithdrawal(deps.storage, DEPOSIT)).toMatchObject({ phase: "awaiting_transfer", transferTxHash: HASH });
+    error.mockRestore();
   });
 
   it("does not fail the withdrawal when telling Aurora or charging the fee fails", async () => {
@@ -133,6 +181,7 @@ describe("error classification", () => {
   it("knows viem's pre-broadcast failures", () => {
     expect(failedBeforeBroadcast({ name: "EstimateGasExecutionError" })).toBe(true);
     expect(failedBeforeBroadcast(new Error("socket hang up"))).toBe(false);
+    expect(failedBeforeBroadcast({ name: "ContractFunctionExecutionError" })).toBe(false);
   });
 
   it("is a WithdrawError", () => {

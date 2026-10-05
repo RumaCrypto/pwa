@@ -33,7 +33,10 @@ export function isUserRejection(err: unknown): boolean {
   return someInChain(err, (e) => e.name === "UserRejectedRequestError" || e.code === 4001);
 }
 
-const PRE_BROADCAST = new Set(["InsufficientFundsError", "EstimateGasExecutionError", "ContractFunctionExecutionError", "ChainMismatchError"]);
+// ContractFunctionExecutionError is deliberately absent: writeContract wraps every
+// failure in it, including timeouts and HTTP errors after the tx was broadcast.
+// The causes below are found inside the wrapper by the chain walk.
+const PRE_BROADCAST = new Set(["InsufficientFundsError", "EstimateGasExecutionError", "ChainMismatchError"]);
 
 /** Errors viem raises while preparing the transaction, before anything reaches the chain. */
 export function failedBeforeBroadcast(err: unknown): boolean {
@@ -76,20 +79,31 @@ export async function executeWithdrawal(
     console.error("Withdrawal transfer failed in an unknown state", err);
     throw new WithdrawError("unconfirmed");
   }
-  updateWithdrawal(deps.storage, address, { transferTxHash: hash });
-
+  // From here the money may have left: anything but a confirmed revert is "unconfirmed".
   let status: "success" | "reverted";
   try {
+    updateWithdrawal(deps.storage, address, { transferTxHash: hash });
     ({ status } = await deps.waitForReceipt({ hash }));
   } catch (err) {
     console.error("No receipt for the withdrawal transfer", err);
     throw new WithdrawError("unconfirmed");
   }
   if (status !== "success") {
-    updateWithdrawal(deps.storage, address, { phase: "transfer_failed" });
+    try {
+      updateWithdrawal(deps.storage, address, { phase: "transfer_failed" });
+    } catch (err) {
+      console.error("Could not record the reverted withdrawal transfer", err);
+      throw new WithdrawError("unconfirmed");
+    }
     throw new WithdrawError("reverted");
   }
-  const withdrawal = updateWithdrawal(deps.storage, address, { phase: "awaiting_deposit" })!;
+  let withdrawal: IntentWithdrawal | undefined;
+  try {
+    withdrawal = updateWithdrawal(deps.storage, address, { phase: "awaiting_deposit" });
+  } catch (err) {
+    console.error("Could not record the withdrawal transfer", err);
+  }
+  if (!withdrawal) throw new WithdrawError("unconfirmed");
 
   // Neither of these may fail the withdrawal: the USDC is already on its way.
   await deps.submitTx(hash, address).catch((err) => console.error("Could not tell Aurora about the deposit", err));
