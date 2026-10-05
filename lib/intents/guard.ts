@@ -23,7 +23,10 @@ export function readGuardConfig(env: Record<string, string | undefined> = proces
     if (limit > 0 && seconds > 0) rateLimit = { limit, windowMs: seconds * 1000 };
   }
 
-  return { authRequired: env.INTENTS_AUTH_REQUIRED !== "false", rateLimit };
+  // Dropping the session check is for local work only; withdrawals move real
+  // money, so production always checks, whatever the env says.
+  const authRequired = env.INTENTS_AUTH_REQUIRED !== "false" || env.VERCEL_ENV === "production";
+  return { authRequired, rateLimit };
 }
 
 /** Fixed window per key. Per server instance, so on serverless it is a brake, not an exact count. */
@@ -110,7 +113,7 @@ async function buildLimiter(rateLimit: NonNullable<GuardConfig["rateLimit"]>): P
   return createMemoryLimiter(rateLimit.limit, rateLimit.windowMs);
 }
 
-export type IntentsRoute = "tokens" | "quote" | "status";
+export type IntentsRoute = "tokens" | "quote" | "quote-dry" | "status" | "submit";
 
 /** Limits are counted per route, so status polling does not eat the quote budget. */
 export async function intentsGuard(request: Request, route: IntentsRoute): Promise<Caller | Response> {

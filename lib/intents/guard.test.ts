@@ -19,6 +19,13 @@ describe("readGuardConfig", () => {
   });
 });
 
+describe("readGuardConfig in production", () => {
+  it("never drops the session check in production, whatever the env says", () => {
+    expect(readGuardConfig({ INTENTS_AUTH_REQUIRED: "false", VERCEL_ENV: "production" }).authRequired).toBe(true);
+    expect(readGuardConfig({ INTENTS_AUTH_REQUIRED: "false", VERCEL_ENV: "preview" }).authRequired).toBe(false);
+  });
+});
+
 describe("readGuardConfig zero values", () => {
   it("falls back to the default on a zero limit or window", () => {
     for (const raw of ["5/0", "0/60", "0/0"]) {
