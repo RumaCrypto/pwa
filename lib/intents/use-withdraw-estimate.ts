@@ -18,43 +18,40 @@ export function useWithdrawEstimate(
   input: { asset: WithdrawAsset; recipient: string; amount: bigint; refundTo: `0x${string}` } | null
 ) {
   const { getAccessToken } = usePrivy();
-  const [state, setState] = useState<{ estimate: WithdrawEstimate | null; loading: boolean; error: unknown }>({
-    estimate: null,
-    loading: false,
-    error: null,
-  });
+  // The result is stored with the key of the inputs it answers, so a result for
+  // older inputs is never shown or saved for the current ones.
+  const [result, setResult] = useState<{ key: string; estimate: WithdrawEstimate | null; error: unknown } | null>(null);
 
   const assetId = input?.asset.assetId;
   const recipient = input?.recipient;
   const amount = input?.amount.toString();
   const refundTo = input?.refundTo;
+  const key = input ? `${assetId}|${recipient}|${amount}|${refundTo}` : null;
 
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect --
-       The estimate follows the form: it resets or starts loading as soon as the inputs change. */
-    if (!input) {
-      setState({ estimate: null, loading: false, error: null });
-      return;
-    }
+    if (!input || key === null) return;
     const controller = new AbortController();
-    setState((s) => ({ ...s, loading: true, error: null }));
-    /* eslint-enable react-hooks/set-state-in-effect */
     const timer = setTimeout(async () => {
       try {
         const request = buildWithdrawQuoteRequest({ ...input, dry: true, now: new Date() });
         const estimate = await requestWithdrawEstimate(request, await getAccessToken(), controller.signal);
-        if (!controller.signal.aborted) setState({ estimate, loading: false, error: null });
+        if (!controller.signal.aborted) setResult({ key, estimate, error: null });
       } catch (err) {
-        if (!controller.signal.aborted) setState({ estimate: null, loading: false, error: err ?? new Error("Unknown error") });
+        if (!controller.signal.aborted) setResult({ key, estimate: null, error: err ?? new Error("Unknown error") });
       }
     }, DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-    // `input` is rebuilt every render; its parts are the real dependencies.
+    // `input` is rebuilt every render; `key` covers its parts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetId, recipient, amount, refundTo, getAccessToken]);
+  }, [key, getAccessToken]);
 
-  return state;
+  const current = result !== null && result.key === key ? result : null;
+  return {
+    estimate: current?.estimate ?? null,
+    loading: key !== null && current === null,
+    error: current?.error ?? null,
+  };
 }

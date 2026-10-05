@@ -71,7 +71,7 @@ function WithdrawForm({ network }: { network: Network }) {
   const amount = parseAmount(amountText, USDC_DECIMALS);
   const tooMuch = amount !== null && max !== null && amount > max;
   const refundTo = owner && isAddress(owner) ? owner : null;
-  const ready = asset && addressValid && !isOwnAddress && amount && !tooMuch && refundTo;
+  const ready = asset && max !== null && addressValid && !isOwnAddress && amount && !tooMuch && refundTo;
 
   const { estimate, loading, error: estimateError } = useWithdrawEstimate(
     ready ? { asset: asset!, recipient: trimmed, amount: amount!, refundTo: refundTo! } : null
