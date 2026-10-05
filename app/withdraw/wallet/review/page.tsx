@@ -47,6 +47,8 @@ function WithdrawReview() {
   const [changed, setChanged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  // Terminal: the transfer may have left but no record exists, so this screen must never offer a retry.
+  const [unconfirmed, setUnconfirmed] = useState(false);
   // A ref, not state: a second tap in the same frame must already see the lock (S4).
   const locked = useRef(false);
 
@@ -79,9 +81,13 @@ function WithdrawReview() {
     locked.current = true;
     setBusy(true);
     setError(null);
+    setChanged(false);
+    // Stays true after a navigation or a terminal state, so the screen can't be used again.
+    let keepLocked = false;
     try {
       const active = findActiveWithdrawal(localStorage, new Date());
       if (active) {
+        keepLocked = true;
         router.replace(`/withdraw/wallet/track/${encodeURIComponent(active.depositAddress)}`);
         return;
       }
@@ -126,21 +132,27 @@ function WithdrawReview() {
         }
       );
       clearDraft(sessionStorage);
+      keepLocked = true;
       router.replace(`/withdraw/wallet/track/${encodeURIComponent(withdrawal.depositAddress)}`);
     } catch (err) {
       // Money may have left: the track screen finds out from Aurora.
       if (err instanceof WithdrawError && err.code === "unconfirmed") {
         const active = findActiveWithdrawal(localStorage, new Date());
         clearDraft(sessionStorage);
+        keepLocked = true;
         if (active) {
           router.replace(`/withdraw/wallet/track/${encodeURIComponent(active.depositAddress)}`);
-          return;
+        } else {
+          setUnconfirmed(true);
         }
+        return;
       }
       setError(err ?? new Error("Unknown error"));
     } finally {
-      locked.current = false;
-      setBusy(false);
+      if (!keepLocked) {
+        locked.current = false;
+        setBusy(false);
+      }
     }
   };
 
@@ -154,10 +166,24 @@ function WithdrawReview() {
       backLabel={t("common.back")}
       footer={
         <>
-          <Button variant="black" onClick={handleConfirm} disabled={busy || !owner}>
-            {busy ? t("withdrawFlow.review.sending") : t("withdrawFlow.review.confirm")}
-          </Button>
-          {(errorText || changed) && (
+          {unconfirmed ? (
+            <>
+              <p style={typography.body3} className="mb-1 text-center font-semibold text-danger">
+                {t("withdrawFlow.track.unconfirmed")}
+              </p>
+              <p style={typography.body5} className="mb-3 text-center text-text-secondary">
+                {t("withdrawFlow.track.unconfirmedHint")}
+              </p>
+              <Button variant="black" onClick={() => router.replace("/home")}>
+                {t("intents.done.backHome")}
+              </Button>
+            </>
+          ) : (
+            <Button variant="black" onClick={handleConfirm} disabled={busy || !owner}>
+              {busy ? t("withdrawFlow.review.sending") : t("withdrawFlow.review.confirm")}
+            </Button>
+          )}
+          {!unconfirmed && (errorText || changed) && (
             <p style={typography.body5} className="mt-3 text-center text-danger">
               {errorText ?? t("withdrawFlow.review.changed")}
             </p>
