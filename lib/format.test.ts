@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { initialsFrom, truncateAddress } from "./format";
+import { initialsFrom, truncateAddress, chunkAddress } from "./format";
 
 describe("initialsFrom", () => {
   it("gives one letter for a single-word name", () => {
@@ -30,5 +30,11 @@ describe("initialsFrom", () => {
 describe("truncateAddress", () => {
   it("keeps the ends and elides the middle", () => {
     expect(truncateAddress("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")).toBe("0x8335…2913");
+  });
+});
+
+describe("chunkAddress", () => {
+  it("splits an address in groups of four for reading it whole", () => {
+    expect(chunkAddress("TR7NHqjeKQxGTCi8q8")).toEqual(["TR7N", "Hqje", "KQxG", "TCi8", "q8"]);
   });
 });
