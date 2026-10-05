@@ -34,8 +34,14 @@ describe("errorKey", () => {
 });
 
 describe("withdrawal errors", () => {
-  it("maps a refused recipient to its own copy", () => {
-    expect(errorKey(new IntentsApiError("Recipient is a token contract", 422))).toBe("withdrawFlow.errors.recipient");
+  it("maps each of our recipient refusals to its own copy", () => {
+    for (const message of ["Recipient is your own wallet", "Recipient is a token contract", "Recipient account does not exist"]) {
+      expect(errorKey(new IntentsApiError(message, 422))).toBe("withdrawFlow.errors.recipient");
+    }
+  });
+
+  it("shows an Aurora-style 422 as-is", () => {
+    expect(errorKey(new IntentsApiError("Unsupported asset", 422))).toBeNull();
   });
 
   it("maps each WithdrawError code, and leaves others to errorKey", () => {
@@ -44,6 +50,7 @@ describe("withdrawal errors", () => {
     expect(withdrawErrorKey(new WithdrawError("balance"))).toBe("withdrawFlow.errors.balance");
     expect(withdrawErrorKey(new WithdrawError("rejected"))).toBe("withdrawFlow.errors.rejected");
     expect(withdrawErrorKey(new WithdrawError("reverted"))).toBe("withdrawFlow.errors.reverted");
+    expect(withdrawErrorKey(new WithdrawError("unconfirmed"))).toBeNull();
     expect(withdrawErrorKey(new Error("x"))).toBeNull();
   });
 });

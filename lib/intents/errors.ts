@@ -12,6 +12,9 @@ export type IntentsErrorKey =
 /** What the quote route answers when the body fails our own validation; the user can't fix that. */
 const INVALID_QUOTE_REQUEST = "Invalid quote request";
 
+/** The refusals our withdrawal routes answer a bad recipient with (422); any other 422 is Aurora's own. */
+const RECIPIENT_REFUSALS = ["Recipient is your own wallet", "Recipient is a token contract", "Recipient account does not exist"];
+
 /**
  * Maps a failed /api/intents call to copy the user can read in their language.
  * Returns null for Aurora's own 4xx answers (e.g. an amount below its minimum):
@@ -24,8 +27,6 @@ export function errorKey(err: unknown): IntentsErrorKey | null {
       return "intents.errors.session";
     case 403:
       return "intents.errors.wallet";
-    case 422:
-      return "withdrawFlow.errors.recipient";
     case 429:
       return "intents.errors.rateLimit";
     // 404 only comes from our routes when the feature flag is off.
@@ -33,6 +34,7 @@ export function errorKey(err: unknown): IntentsErrorKey | null {
     case 503:
       return "intents.errors.unavailable";
   }
+  if (err.status === 422 && RECIPIENT_REFUSALS.includes(err.message)) return "withdrawFlow.errors.recipient";
   if (err.status === 400 && err.message === INVALID_QUOTE_REQUEST) return "intents.errors.generic";
   if (err.status >= 400 && err.status < 500) return null;
   return "intents.errors.generic";

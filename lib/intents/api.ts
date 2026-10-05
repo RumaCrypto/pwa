@@ -66,7 +66,13 @@ export async function fetchDepositStatus(
   return parseStatusResponse(await response.json());
 }
 
-async function postJson(url: string, body: unknown, accessToken: string | null, fetchImpl: typeof fetch, signal?: AbortSignal) {
+async function postJson(
+  url: string,
+  body: unknown,
+  accessToken: string | null,
+  fetchImpl: typeof fetch,
+  signal?: AbortSignal
+): Promise<unknown> {
   const response = await fetchImpl(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders(accessToken) },

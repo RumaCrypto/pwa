@@ -7,7 +7,7 @@ import {
   requestWithdrawQuote,
   submitDepositTx,
 } from "./api";
-import type { QuoteRequest } from "./quote";
+import { parseWithdrawEstimate, type QuoteRequest } from "./quote";
 
 const json = (status: number, body: unknown) =>
   vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
@@ -68,13 +68,18 @@ describe("withdrawal calls", () => {
   it("asks the dry route for estimates and passes the abort signal", async () => {
     const fetchImpl = ok({ quote: { amountOut: "1", amountOutFormatted: "1", minAmountOut: "1", timeEstimate: 1 } });
     const signal = new AbortController().signal;
-    await requestWithdrawEstimate(request, "tok", signal, fetchImpl as never);
+    const estimate = await requestWithdrawEstimate(request, "tok", signal, fetchImpl as never);
+    expect(estimate).toEqual(parseWithdrawEstimate({ quote: { amountOut: "1", amountOutFormatted: "1", minAmountOut: "1", timeEstimate: 1 } }));
     expect(fetchImpl).toHaveBeenCalledWith("/api/intents/quote/dry", expect.objectContaining({ method: "POST", signal }));
   });
 
   it("posts the tx hash and deposit address to the submit route", async () => {
     const fetchImpl = ok({});
-    await submitDepositTx(`0x${"ab".repeat(32)}`, "0x9f3a00000000000000000000000000000000c21e", "tok", fetchImpl as never);
+    const txHash = `0x${"ab".repeat(32)}`;
+    const depositAddress = "0x9f3a00000000000000000000000000000000c21e";
+    await submitDepositTx(txHash, depositAddress, "tok", fetchImpl as never);
+    const init = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(JSON.parse(init.body as string)).toEqual({ txHash, depositAddress });
     expect(fetchImpl).toHaveBeenCalledWith(
       "/api/intents/submit",
       expect.objectContaining({ method: "POST", headers: expect.objectContaining({ Authorization: "Bearer tok" }) })
