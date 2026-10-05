@@ -35,4 +35,47 @@ describe("withdraw draft", () => {
     storage.setItem("ruma-withdraw-draft", "not json");
     expect(readDraft(storage)).toBeNull();
   });
+
+  it("refuses non-digit minAmountOut", () => {
+    const storage = memoryStorage();
+    saveDraft(storage, { ...DRAFT, estimate: { ...DRAFT.estimate, minAmountOut: "abc" } });
+    expect(readDraft(storage)).toBeNull();
+  });
+
+  it("refuses non-digit amountOut", () => {
+    const storage = memoryStorage();
+    saveDraft(storage, { ...DRAFT, estimate: { ...DRAFT.estimate, amountOut: "not a number" } });
+    expect(readDraft(storage)).toBeNull();
+  });
+
+  it("refuses negative decimals", () => {
+    const storage = memoryStorage();
+    saveDraft(storage, { ...DRAFT, asset: { ...DRAFT.asset, decimals: -1 } });
+    expect(readDraft(storage)).toBeNull();
+  });
+
+  it("refuses decimals > 36", () => {
+    const storage = memoryStorage();
+    saveDraft(storage, { ...DRAFT, asset: { ...DRAFT.asset, decimals: 37 } });
+    expect(readDraft(storage)).toBeNull();
+  });
+
+  it("refuses missing timeEstimate", () => {
+    const storage = memoryStorage();
+    const estimate = { amountOut: "1", amountOutFormatted: "1", minAmountOut: "1" };
+    saveDraft(storage, { ...DRAFT, estimate } as any);
+    expect(readDraft(storage)).toBeNull();
+  });
+
+  it("refuses non-number priceUsd", () => {
+    const storage = memoryStorage();
+    saveDraft(storage, { ...DRAFT, asset: { ...DRAFT.asset, priceUsd: "1" } } as any);
+    expect(readDraft(storage)).toBeNull();
+  });
+
+  it("refuses infinite timeEstimate", () => {
+    const storage = memoryStorage();
+    saveDraft(storage, { ...DRAFT, estimate: { ...DRAFT.estimate, timeEstimate: Infinity } });
+    expect(readDraft(storage)).toBeNull();
+  });
 });

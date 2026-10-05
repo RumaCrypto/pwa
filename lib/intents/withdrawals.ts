@@ -42,11 +42,14 @@ function serialise(w: IntentWithdrawal): Stored {
   return { ...w, createdAt: w.createdAt.toISOString(), deadline: w.deadline.toISOString(), completedAt: w.completedAt?.toISOString() };
 }
 
-function revive(stored: Stored): IntentWithdrawal {
+function revive(stored: Stored): IntentWithdrawal | null {
+  const createdAt = new Date(stored.createdAt);
+  const deadline = new Date(stored.deadline);
+  if (!Number.isFinite(createdAt.getTime()) || !Number.isFinite(deadline.getTime())) return null;
   const w: IntentWithdrawal = {
     ...stored,
-    createdAt: new Date(stored.createdAt),
-    deadline: new Date(stored.deadline),
+    createdAt,
+    deadline,
     completedAt: stored.completedAt ? new Date(stored.completedAt) : undefined,
   };
   if (!w.completedAt) delete w.completedAt;
@@ -85,7 +88,9 @@ export function saveWithdrawal(storage: DepositStorage, withdrawal: IntentWithdr
 
 export function getWithdrawal(storage: DepositStorage, address: string): IntentWithdrawal | undefined {
   const stored = readAll(storage)[address];
-  return stored ? revive(stored) : undefined;
+  if (!stored) return undefined;
+  const w = revive(stored);
+  return w ?? undefined;
 }
 
 export function updateWithdrawal(
@@ -106,7 +111,11 @@ export function isWithdrawalSettled(phase: WithdrawalPhase): boolean {
 
 export function findActiveWithdrawal(storage: DepositStorage, now: Date): IntentWithdrawal | undefined {
   return Object.values(readAll(storage))
-    .map(revive)
+    .map((stored) => {
+      if (stored === null || typeof stored !== "object") return null;
+      return revive(stored);
+    })
+    .filter((w): w is IntentWithdrawal => w !== null)
     .find((w) => !isWithdrawalSettled(w.phase) && now.getTime() - w.createdAt.getTime() < ACTIVE_WINDOW_MS);
 }
 
@@ -115,8 +124,11 @@ export function findActiveWithdrawal(storage: DepositStorage, now: Date): Intent
  * not seen yet, so a withdrawal whose transfer was never confirmed stays
  * "awaiting_transfer" until Aurora reports the deposit: claiming it was sent
  * could lead the user to assume the money left, or to retry and pay twice.
+ * "transfer_failed" is final: if the wallet declined or the chain rejected
+ * the transfer, the stored state is authoritative regardless of Aurora's status.
  */
 export function withdrawalPhaseFor(stored: WithdrawalPhase, status: IntentStatus): WithdrawalPhase {
+  if (stored === "transfer_failed") return "transfer_failed";
   if (stored === "awaiting_transfer" && status === "PENDING_DEPOSIT") return "awaiting_transfer";
   return phaseFor(status);
 }

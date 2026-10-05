@@ -76,12 +76,34 @@ describe("findActiveWithdrawal", () => {
     expect(findActiveWithdrawal(storage, NOW)?.phase).toBe("processing");
   });
 
+  it("finds a 5-minute-old awaiting_transfer (crash mid-signature case)", () => {
+    const storage = memoryStorage();
+    saveWithdrawal(storage, at("awaiting_transfer", 5));
+    expect(findActiveWithdrawal(storage, NOW)?.phase).toBe("awaiting_transfer");
+  });
+
+  it("ignores a withdrawal exactly 30 minutes old (window is < 30 min)", () => {
+    const storage = memoryStorage();
+    saveWithdrawal(storage, at("awaiting_transfer", 30));
+    expect(findActiveWithdrawal(storage, NOW)).toBeUndefined();
+  });
+
   it("ignores settled, failed-to-send and old ones", () => {
     const storage = memoryStorage();
     saveWithdrawal(storage, at("completed", 1));
     saveWithdrawal(storage, at("transfer_failed", 1));
     saveWithdrawal(storage, at("awaiting_transfer", 31));
     expect(findActiveWithdrawal(storage, NOW)).toBeUndefined();
+  });
+
+  it("skips null and non-object entries in storage", () => {
+    const storage = memoryStorage();
+    const all = {
+      "0x0000000000000000000000000000000000000001": null,
+      "0x0000000000000000000000000000000000000002": { ...withdrawalFromQuote(QUOTE, ASSET, "T…", new Date(NOW.getTime() - 5 * 60_000)), phase: "awaiting_transfer" as const },
+    };
+    storage.setItem("ruma-intent-withdrawals", JSON.stringify(all));
+    expect(findActiveWithdrawal(storage, NOW)?.phase).toBe("awaiting_transfer");
   });
 });
 
@@ -95,6 +117,11 @@ describe("withdrawalPhaseFor", () => {
     expect(withdrawalPhaseFor("awaiting_deposit", "PENDING_DEPOSIT")).toBe("awaiting_deposit");
     expect(withdrawalPhaseFor("processing", "SUCCESS")).toBe("completed");
     expect(withdrawalPhaseFor("processing", "REFUNDED")).toBe("refunded");
+  });
+
+  it("treats transfer_failed as final regardless of Aurora status", () => {
+    expect(withdrawalPhaseFor("transfer_failed", "PENDING_DEPOSIT")).toBe("transfer_failed");
+    expect(withdrawalPhaseFor("transfer_failed", "PROCESSING")).toBe("transfer_failed");
   });
 });
 

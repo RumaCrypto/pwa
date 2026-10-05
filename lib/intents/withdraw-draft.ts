@@ -37,6 +37,9 @@ export function readDraft(storage: DraftStorage): WithdrawDraft | null {
       typeof asset.assetId === "string" &&
       typeof asset.symbol === "string" &&
       Number.isInteger(asset.decimals) &&
+      asset.decimals >= 0 &&
+      asset.decimals <= 36 &&
+      typeof asset.priceUsd === "number" &&
       typeof asset.network === "string" &&
       isNetworkId(asset.network) &&
       typeof recipient === "string" &&
@@ -46,8 +49,12 @@ export function readDraft(storage: DraftStorage): WithdrawDraft | null {
       BigInt(amount) > 0n &&
       estimate &&
       typeof estimate.amountOut === "string" &&
+      /^\d+$/.test(estimate.amountOut) &&
       typeof estimate.minAmountOut === "string" &&
-      typeof estimate.amountOutFormatted === "string";
+      /^\d+$/.test(estimate.minAmountOut) &&
+      typeof estimate.amountOutFormatted === "string" &&
+      typeof estimate.timeEstimate === "number" &&
+      Number.isFinite(estimate.timeEstimate);
     return valid ? draft : null;
   } catch {
     return null;
