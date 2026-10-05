@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       status: response.status,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Fetch failed" }, { status: 502 });
+  } catch {
+    return NextResponse.json({ error: "Could not reach Aurora" }, { status: 502 });
   }
 }

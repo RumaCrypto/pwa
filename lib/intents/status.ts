@@ -57,3 +57,8 @@ export function parseStatusResponse(body: unknown): StatusResult {
   if (typeof hash === "string") result.destinationTxHash = hash;
   return result;
 }
+
+/** Deposit addresses of every chain we support fit this; anything else never reaches Aurora's URL. */
+export function isPlausibleDepositAddress(value: string): boolean {
+  return /^[A-Za-z0-9._:-]{20,128}$/.test(value);
+}

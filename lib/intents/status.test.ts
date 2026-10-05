@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isTerminal, parseStatusResponse, phaseFor } from "./status";
+import { isPlausibleDepositAddress, isTerminal, parseStatusResponse, phaseFor } from "./status";
 
 describe("phaseFor", () => {
   it("maps every Aurora status to a phase the screen knows how to show", () => {
@@ -44,5 +44,15 @@ describe("parseStatusResponse", () => {
 
   it("rejects an unknown status instead of guessing", () => {
     expect(() => parseStatusResponse({ status: "WAT" })).toThrow(/status/);
+  });
+});
+
+describe("isPlausibleDepositAddress", () => {
+  it("accepts addresses of every supported chain and refuses junk", () => {
+    expect(isPlausibleDepositAddress("0x9f3a00000000000000000000000000000000c21e")).toBe(true);
+    expect(isPlausibleDepositAddress("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4")).toBe(true);
+    expect(isPlausibleDepositAddress("a".repeat(64))).toBe(true);
+    expect(isPlausibleDepositAddress("short")).toBe(false);
+    expect(isPlausibleDepositAddress("x/../../admin?y=1")).toBe(false);
   });
 });
