@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
-import { ArrowDownLeft, ArrowUpRight, Plus, Settings, Store } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, Copy, Plus, Settings, Store } from "lucide-react";
 import clsx from "clsx";
 
 import { Button } from "@/components/ui/button";
@@ -31,12 +31,14 @@ import { MAX_LEVEL } from "@/lib/limits/limits";
 import { FLAGS } from "@/lib/flags";
 import { formatDayAndTime } from "@/lib/datetime";
 import { truncateAddress } from "@/lib/format";
+import { useUsername } from "@/lib/settings/use-username";
 
 export default function HomePage() {
   const router = useRouter();
   const { t } = useI18n();
   const { ready, authenticated, user } = usePrivy();
   const address = user?.wallet?.address;
+  const { displayName: ownName } = useUsername();
 
   const { balance, loading: balanceLoading } = useUsdcBalance(address);
   const { format, formatParts } = useMoney();
@@ -80,16 +82,33 @@ export default function HomePage() {
       }
     >
       <header className="flex items-center justify-between gap-3">
-        <button onClick={copyAddress} disabled={!address} className="active:opacity-70">
+        {/* The name is only a label; tapping always copies the full address, which is what people paste elsewhere. */}
+        <button
+          onClick={copyAddress}
+          disabled={!address}
+          aria-label={address ? t("home.copyAddress") : undefined}
+          className="min-w-0 active:opacity-70"
+        >
           <Badge className="gap-2 py-1.5 pl-1.5 pr-3">
-            <span className="h-5 w-5 rounded-full bg-primary" />
-            <span>
-              {addressCopied
-                ? t("common.copied")
-                : address
-                  ? truncateAddress(address)
-                  : t("tabs.home.greeting")}
+            <span className="h-5 w-5 shrink-0 rounded-full bg-primary" />
+            <span className="flex min-w-0 flex-col items-start text-left leading-tight">
+              <span className="max-w-40 truncate">
+                {addressCopied
+                  ? t("common.copied")
+                  : (ownName ?? (address ? truncateAddress(address) : t("tabs.home.greeting")))}
+              </span>
+              {ownName && address && !addressCopied && (
+                <span style={typography.label5} className="text-text-secondary">
+                  {truncateAddress(address)}
+                </span>
+              )}
             </span>
+            {address &&
+              (addressCopied ? (
+                <Check size={14} className="shrink-0 text-primary" aria-hidden />
+              ) : (
+                <Copy size={14} className="shrink-0 text-text-secondary" aria-hidden />
+              ))}
           </Badge>
         </button>
 

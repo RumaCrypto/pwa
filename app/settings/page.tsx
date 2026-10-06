@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { useI18n } from "@/lib/i18n/i18n-context";
@@ -9,10 +10,14 @@ import { CURRENCIES, CURRENCY_CODES } from "@/lib/money/currencies";
 import { fromNumber } from "@/lib/money/money";
 import { COUNTRIES, countryName } from "@/lib/contacts/contacts";
 import { useResidency } from "@/lib/settings/residency-context";
+import { useUsername } from "@/lib/settings/use-username";
+import { USERNAME_MAX_LENGTH, emailName, normalizeUsername } from "@/lib/settings/username";
 import { Screen } from "@/components/ui/screen";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { Callout } from "@/components/ui/callout";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { typography } from "@/constants/typography";
 
 export default function SettingsPage() {
@@ -29,6 +34,8 @@ export default function SettingsPage() {
 
   return (
     <Screen title={t("settings")} backLabel={t("common.back")}>
+      <UsernameSection />
+
       <Section title={t("settings.selectLanguage")}>
         <Card divided>
           {LANGUAGES.map((lang) => (
@@ -81,6 +88,50 @@ export default function SettingsPage() {
         </Card>
       </Section>
     </Screen>
+  );
+}
+
+function UsernameSection() {
+  const { t } = useI18n();
+  const { username, email, setUsername } = useUsername();
+  const [draft, setDraft] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect --
+       The stored name is read after mount; mirror it into the field once known. */
+    setDraft(username ?? "");
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [username]);
+
+  const unchanged = normalizeUsername(draft) === username;
+
+  const save = () => {
+    setUsername(draft);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <Section title={t("settings.username")} hint={t("settings.usernameHint")}>
+      <div className="flex gap-2">
+        <Input
+          className="min-w-0 flex-1"
+          maxLength={USERNAME_MAX_LENGTH}
+          placeholder={emailName(email) ?? t("settings.usernamePlaceholder")}
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setSaved(false);
+          }}
+        />
+        <div className="w-28 shrink-0">
+          <Button variant="black" onClick={save} disabled={unchanged}>
+            {saved ? t("settings.usernameSaved") : t("settings.usernameSave")}
+          </Button>
+        </div>
+      </div>
+    </Section>
   );
 }
 
