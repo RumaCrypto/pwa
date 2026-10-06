@@ -36,7 +36,12 @@ function authHeaders(accessToken: string | null): Record<string, string> {
 export async function fetchTokens(accessToken: string | null, fetchImpl: typeof fetch = fetch): Promise<IntentsToken[]> {
   const response = await fetchImpl("/api/intents/tokens", { headers: authHeaders(accessToken) });
   if (!response.ok) throw await errorFrom(response);
-  return response.json();
+  // Aurora wraps the list as { asset_stats, tokens }; a bare array is accepted
+  // too, so the screens don't depend on which shape the proxy forwards.
+  const body = (await response.json()) as unknown;
+  const tokens = Array.isArray(body) ? body : (body as { tokens?: unknown } | null)?.tokens;
+  if (!Array.isArray(tokens)) throw new Error("Aurora returned no token list");
+  return tokens as IntentsToken[];
 }
 
 export async function requestDepositQuote(

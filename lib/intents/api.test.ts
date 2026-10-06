@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   IntentsApiError,
   fetchDepositStatus,
+  fetchTokens,
   requestDepositQuote,
   requestWithdrawEstimate,
   requestWithdrawQuote,
@@ -89,5 +90,22 @@ describe("withdrawal calls", () => {
   it("raises IntentsApiError with the status on refusal", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ error: "Recipient is a token contract" }), { status: 422 }));
     await expect(requestWithdrawQuote(request, "tok", fetchImpl as never)).rejects.toMatchObject({ status: 422 });
+  });
+});
+
+describe("fetchTokens", () => {
+  const TOKEN = { assetId: "nep141:wrap.near", decimals: 24, blockchain: "near", symbol: "wNEAR", price: 5, contractAddress: "wrap.near" };
+
+  it("unwraps the token list from Aurora's { asset_stats, tokens } envelope", async () => {
+    const tokens = await fetchTokens("tok", json(200, { asset_stats: [], tokens: [TOKEN] }));
+    expect(tokens).toEqual([TOKEN]);
+  });
+
+  it("still accepts a bare array", async () => {
+    expect(await fetchTokens("tok", json(200, [TOKEN]))).toEqual([TOKEN]);
+  });
+
+  it("fails loudly on a body with no token list", async () => {
+    await expect(fetchTokens("tok", json(200, { asset_stats: [] }))).rejects.toThrow(/token list/);
   });
 });
