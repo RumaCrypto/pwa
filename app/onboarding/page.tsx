@@ -42,7 +42,7 @@ export default function OnboardingWelcome() {
       className="flex min-h-dvh flex-col pb-8"
       style={{ background: "linear-gradient(180deg, #e8f0ff 0%, #f3f6ff 42%, #fafafa 100%)" }}
     >
-      <div className="flex items-center justify-between px-6 pt-6">
+      <div className="flex items-center justify-between pl-6 pr-18 pt-6">
         <RumaLogo />
         <LanguagePicker />
       </div>

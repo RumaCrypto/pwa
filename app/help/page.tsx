@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpRight, CreditCard, Gauge, QrCode, Wallet } from "lucide-react";
+import { ArrowUpRight, CreditCard, Gauge, Headset, QrCode, Wallet } from "lucide-react";
 
 import { Screen } from "@/components/ui/screen";
 import { Card } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { Timeline } from "@/components/ui/timeline";
 import { DetailRow } from "@/components/ui/detail-row";
 import { AccordionItem } from "@/components/ui/accordion";
 import { typography } from "@/constants/typography";
+import { openSupport } from "@/constants/support";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { LOCALES } from "@/lib/i18n/languages";
@@ -73,7 +74,10 @@ export default function HelpScreen() {
       </Section>
 
       <Callout className="mt-8" title={t("help.contact.title")}>
-        {t("help.contact.body")}
+        <Button className="mt-4" onClick={openSupport}>
+          <Headset size={20} />
+          {t("tabs.help.contactSupport.title")}
+        </Button>
       </Callout>
     </Screen>
   );

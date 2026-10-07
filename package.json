@@ -23,6 +23,7 @@
     "jsqr": "^1.4.0",
     "lucide-react": "^1.34.0",
     "next": "16.2.10",
+    "qrcode-generator": "^2.0.4",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "serwist": "latest",
