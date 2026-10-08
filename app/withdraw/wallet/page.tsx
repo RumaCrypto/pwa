@@ -2,126 +2,65 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { usePrivy } from "@privy-io/react-auth";
-import { isAddress, type Address } from "viem";
 
 import { Screen } from "@/components/ui/screen";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Callout } from "@/components/ui/callout";
-import { DetailRow } from "@/components/ui/detail-row";
+import { RadioCard } from "@/components/ui/radio-card";
+import { NetworkLogo, NetworkLogoStack } from "@/components/ui/network-logos";
+import { SendUsdcOnBase } from "@/components/cashflow/send-usdc-on-base";
 import { typography } from "@/constants/typography";
 
-import { DEFAULT_SETTLEMENT_NETWORK } from "@/constants/blockchain";
 import { useI18n } from "@/lib/i18n/i18n-context";
-import { useUsdcBalance } from "@/hooks/use-usdc-balance";
-import { useP2pWalletClient } from "@/hooks/use-p2p-wallet-client";
-import { sendUsdc } from "@/lib/withdraw/transfers";
-import { USDC_DECIMALS } from "@/lib/usdc";
+import { FLAGS } from "@/lib/flags";
+import { BASE_NETWORK, NETWORKS } from "@/lib/intents/networks";
 
-/** Digits with at most USDC's six decimals, using "." or "," as the separator. */
-const AMOUNT_PATTERN = new RegExp(`^\\d*([.,]\\d{0,${USDC_DECIMALS}})?$`);
+type Destination = "base" | "networks";
 
-export default function WithdrawWalletScreen() {
+/** Display order the designs ask for on the "other networks" option. */
+const STACK_ORDER = ["tron", "btc", "eth", "op", "arb", "near"] as const;
+const STACK = STACK_ORDER.map((id) => NETWORKS.find((n) => n.id === id)!);
+
+export default function WithdrawToWalletScreen() {
+  // Without Aurora there is only one way out, so skip straight to it.
+  if (!FLAGS.multichainDeposits) return <SendUsdcOnBase />;
+  return <DestinationPicker />;
+}
+
+function DestinationPicker() {
   const router = useRouter();
   const { t } = useI18n();
-  const { user } = usePrivy();
-  const { balance } = useUsdcBalance(user?.wallet?.address);
-  const getWalletClient = useP2pWalletClient();
-
-  const [amount, setAmount] = useState("");
-  const [address, setAddress] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const normalised = amount.replace(",", ".");
-  const value = Number(normalised);
-  const addressTrimmed = address.trim();
-  const addressValid = isAddress(addressTrimmed);
-  const overBalance = balance !== null && value > Number(balance);
-  const ready = value > 0 && addressValid && !overBalance && !submitting;
-
-  const handleConfirm = async () => {
-    setError(null);
-    setSubmitting(true);
-    try {
-      const { walletClient, address: from } = await getWalletClient();
-      const transfer = await sendUsdc({
-        walletClient,
-        from,
-        to: addressTrimmed as Address,
-        amount: normalised,
-      });
-      router.replace(`/withdraw/wallet/${transfer.id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setSubmitting(false);
-    }
-  };
+  const [destination, setDestination] = useState<Destination>("base");
 
   return (
     <Screen
-      title={t("cashflow.out.wallet")}
+      title={t("cashflow.withdrawWallet.title")}
       backLabel={t("common.back")}
       footer={
-        <>
-          <Button variant="black" onClick={handleConfirm} disabled={!ready}>
-            {submitting ? t("withdrawFlow.wallet.sending") : t("withdrawFlow.wallet.confirm")}
-          </Button>
-          {error && (
-            <p style={typography.body5} className="mt-3 text-center text-danger">
-              {t("withdrawFlow.wallet.failed", { error })}
-            </p>
-          )}
-        </>
+        <Button variant="black" onClick={() => router.push(`/withdraw/wallet/${destination}`)}>
+          {t("cashflow.continue")}
+        </Button>
       }
     >
-      <p style={typography.label3} className="mb-2">
-        {t("withdrawFlow.wallet.amount")}
-      </p>
-      <Input
-        value={amount}
-        inputMode="decimal"
-        onChange={(event) => AMOUNT_PATTERN.test(event.target.value) && setAmount(event.target.value)}
-        placeholder="0.00"
-        leading={<span className="text-text-secondary">USDC</span>}
-      />
-      <p style={typography.body5} className="mt-1.5 text-text-secondary">
-        {t("withdrawFlow.wallet.available", { balance: balance ?? "—" })}
-      </p>
-      {overBalance && (
-        <p style={typography.body4} className="mt-2 text-danger">
-          {t("withdrawFlow.amount.overBalance")}
-        </p>
-      )}
+      <h2 style={typography.display3} className="mb-6">
+        {t("cashflow.withdrawWallet.question")}
+      </h2>
 
-      <p style={typography.label3} className="mt-5 mb-2">
-        {t("withdrawFlow.wallet.address")}
-      </p>
-      <Input
-        value={address}
-        onChange={(event) => setAddress(event.target.value)}
-        placeholder="0x…"
-        autoCapitalize="none"
-        autoCorrect="off"
-        spellCheck={false}
-      />
-      {addressTrimmed.length > 0 && !addressValid && (
-        <p style={typography.body4} className="mt-2 text-danger">
-          {t("withdrawFlow.wallet.invalidAddress")}
-        </p>
-      )}
-
-      <Card className="mt-6 px-5 py-3">
-        <DetailRow label={t("cashflow.receive.network")} value={DEFAULT_SETTLEMENT_NETWORK.name} />
-        <DetailRow label={t("cashflow.receive.asset")} value="USDC" />
-        <DetailRow label={t("cashflow.cost")} value={t("cashflow.free")} />
-      </Card>
-
-      <Callout className="mt-4">
-        {t("withdrawFlow.wallet.networkWarning", { network: DEFAULT_SETTLEMENT_NETWORK.name })}
-      </Callout>
+      <div role="radiogroup" className="flex flex-col gap-3">
+        <RadioCard
+          title={t("cashflow.withdrawWallet.base")}
+          description={t("cashflow.withdrawWallet.baseHint")}
+          leading={<NetworkLogo network={BASE_NETWORK} size={24} />}
+          selected={destination === "base"}
+          onSelect={() => setDestination("base")}
+        />
+        <RadioCard
+          title={t("cashflow.withdrawWallet.other")}
+          description={t("cashflow.withdrawWallet.otherHint")}
+          leading={<NetworkLogoStack networks={STACK} />}
+          selected={destination === "networks"}
+          onSelect={() => setDestination("networks")}
+        />
+      </div>
     </Screen>
   );
 }
