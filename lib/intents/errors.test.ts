@@ -55,3 +55,11 @@ describe("withdrawal errors", () => {
     expect(withdrawErrorKey(new Error("x"))).toBeNull();
   });
 });
+
+describe("session check errors", () => {
+  it("tells the user to retry when the session could not be checked, instead of saying it expired", () => {
+    expect(errorKey(new IntentsApiError("Could not check your session", 503))).toBe("intents.errors.sessionCheck");
+    expect(errorKey(new IntentsApiError("Invalid session", 401))).toBe("intents.errors.session");
+    expect(errorKey(new IntentsApiError("Deposits from other networks are not configured", 503))).toBe("intents.errors.unavailable");
+  });
+});

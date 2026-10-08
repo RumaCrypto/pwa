@@ -796,6 +796,7 @@
   "withdrawFlow.done.transaction": "Transaction",
   "withdrawFlow.done.view": "View",
   "intents.errors.session": "Your session expired. Sign in again.",
+  "intents.errors.sessionCheck": "We couldn't check your session. Try again in a moment.",
   "intents.errors.wallet": "This deposit must go to your own wallet.",
   "intents.errors.rateLimit": "Too many attempts. Try again in a minute.",
   "intents.errors.unavailable": "Deposits from other networks are not available right now.",

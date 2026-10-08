@@ -71,7 +71,9 @@ export async function guardRequest(
     try {
       const { userId } = await deps.verify(token);
       caller = { userId, key: userId };
-    } catch {
+    } catch (err) {
+      // Privy unreachable is not the user's fault: saying "session expired" would send them to sign in for nothing.
+      if ((err as { name?: unknown } | null)?.name === "SessionCheckUnavailable") return deny(503, "Could not check your session");
       return deny(401, "Invalid session");
     }
   } else {
@@ -131,4 +133,14 @@ export async function intentsGuard(request: Request, route: IntentsRoute): Promi
   const shared = sharedLimiter;
   const limiter: Limiter | null = shared ? (key) => shared(`${route}:${key}`) : null;
   return guardRequest(request, { config, verify: verifyPrivyToken, limiter });
+}
+
+/**
+ * Privy's SDK reports every verification failure as InvalidAuthTokenError; only
+ * the message says whether the token was bad or the check itself couldn't run
+ * (its catch-all also covers a timeout fetching the signing keys).
+ */
+export function sessionCheckFailure(err: unknown): "invalid" | "unavailable" {
+  const message = err instanceof Error ? err.message : "";
+  return /expired|is invalid/i.test(message) ? "invalid" : "unavailable";
 }

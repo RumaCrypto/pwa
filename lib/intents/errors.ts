@@ -7,10 +7,13 @@ export type IntentsErrorKey =
   | "intents.errors.rateLimit"
   | "intents.errors.unavailable"
   | "intents.errors.generic"
+  | "intents.errors.sessionCheck"
   | "withdrawFlow.errors.recipient";
 
 /** What the quote route answers when the body fails our own validation; the user can't fix that. */
 const INVALID_QUOTE_REQUEST = "Invalid quote request";
+/** What the guard answers when Privy couldn't be reached to check the session. */
+const SESSION_CHECK_UNAVAILABLE = "Could not check your session";
 
 /** The refusals our withdrawal routes answer a bad recipient with (422); any other 422 is Aurora's own. */
 const RECIPIENT_REFUSALS = ["Recipient is your own wallet", "Recipient is a token contract", "Recipient account does not exist"];
@@ -31,7 +34,9 @@ export function errorKey(err: unknown): IntentsErrorKey | null {
       return "intents.errors.rateLimit";
     // 404 only comes from our routes when the feature flag is off.
     case 404:
+      return "intents.errors.unavailable";
     case 503:
+      if (err.message === SESSION_CHECK_UNAVAILABLE) return "intents.errors.sessionCheck";
       return "intents.errors.unavailable";
   }
   if (err.status === 422 && RECIPIENT_REFUSALS.includes(err.message)) return "withdrawFlow.errors.recipient";

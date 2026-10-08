@@ -796,6 +796,7 @@
   "withdrawFlow.done.transaction": "Transação",
   "withdrawFlow.done.view": "Ver",
   "intents.errors.session": "Sua sessão expirou. Entre novamente.",
+  "intents.errors.sessionCheck": "Não conseguimos verificar sua sessão. Tente novamente em instantes.",
   "intents.errors.wallet": "Este depósito deve ir para sua própria carteira.",
   "intents.errors.rateLimit": "Muitas tentativas. Tente novamente em um minuto.",
   "intents.errors.unavailable": "Depósitos de outras redes não estão disponíveis agora.",

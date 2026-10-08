@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryLimiter, guardRequest, readGuardConfig, redisCredentials, type GuardConfig } from "./guard";
+import { createMemoryLimiter, guardRequest, readGuardConfig, redisCredentials, sessionCheckFailure, type GuardConfig } from "./guard";
 
 describe("readGuardConfig", () => {
   it("requires a session and limits to 30 per minute by default", () => {
@@ -58,6 +58,15 @@ describe("guardRequest", () => {
     expect(((await guardRequest(bad, { config: on, verify, limiter: null })) as Response).status).toBe(401);
   });
 
+  it("answers 503, not 401, when the session could not be checked (Privy unreachable)", async () => {
+    const unreachable = vi.fn(async () => {
+      throw Object.assign(new Error("jwks timeout"), { name: "SessionCheckUnavailable" });
+    });
+    const res = (await guardRequest(req({ Authorization: "Bearer good" }), { config: on, verify: unreachable, limiter: null })) as Response;
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "Could not check your session" });
+  });
+
   it("lets a valid session through, keyed by user", async () => {
     const ok = await guardRequest(req({ Authorization: "Bearer good" }), { config: on, verify, limiter: null });
     expect(ok).toEqual({ userId: "did:privy:1", key: "did:privy:1" });
@@ -96,5 +105,17 @@ describe("redisCredentials", () => {
     expect(redisCredentials({})).toBeNull();
     expect(redisCredentials({ UPSTASH_REDIS_REST_URL: "https://u" })).toBeNull();
     expect(redisCredentials({ KV_REST_API_TOKEN: "k" })).toBeNull();
+  });
+});
+
+describe("sessionCheckFailure", () => {
+  it("treats an expired or malformed token as the user's session problem", () => {
+    expect(sessionCheckFailure(new Error("Authentication token expired"))).toBe("invalid");
+    expect(sessionCheckFailure(new Error("Authentication token is invalid"))).toBe("invalid");
+  });
+
+  it("treats Privy's catch-all (key fetch timeout, network) as a check that couldn't run", () => {
+    expect(sessionCheckFailure(new Error("Failed to verify authentication token"))).toBe("unavailable");
+    expect(sessionCheckFailure(new TypeError("fetch failed"))).toBe("unavailable");
   });
 });
