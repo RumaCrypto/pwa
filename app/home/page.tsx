@@ -92,16 +92,19 @@ export default function HomePage() {
           <Badge className="gap-2 py-1.5 pl-1.5 pr-3">
             <span className="h-5 w-5 shrink-0 rounded-full bg-primary" />
             <span className="flex min-w-0 flex-col items-start text-left leading-tight">
-              <span className="max-w-40 truncate">
+              {/* A chosen name or the email takes the label's place; without one, say what the address is. */}
+              {ownName ? (
+                <span className="max-w-40 truncate">{ownName}</span>
+              ) : (
+                <span className="text-xs">{t("tabs.home.address")}:</span>
+              )}
+              <span style={ownName ? typography.label5 : undefined} className={ownName ? "text-text-secondary" : undefined}>
                 {addressCopied
                   ? t("common.copied")
-                  : (ownName ?? (address ? truncateAddress(address) : t("tabs.home.greeting")))}
+                  : address
+                    ? truncateAddress(address)
+                    : t("tabs.home.greeting")}
               </span>
-              {ownName && address && !addressCopied && (
-                <span style={typography.label5} className="text-text-secondary">
-                  {truncateAddress(address)}
-                </span>
-              )}
             </span>
             {address &&
               (addressCopied ? (
@@ -136,6 +139,7 @@ export default function HomePage() {
             label={t("home.balance.label")}
             caption={t("home.balance.caption")}
             footer={t("home.balance.footer")}
+            backgroundImage="/RumaBalanceCardBg.png"
             className="min-h-44"
           >
             <p style={typography.display1} className={clsx(pending && "opacity-60")}>
