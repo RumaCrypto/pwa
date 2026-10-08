@@ -23,7 +23,10 @@ export function readGuardConfig(env: Record<string, string | undefined> = proces
     if (limit > 0 && seconds > 0) rateLimit = { limit, windowMs: seconds * 1000 };
   }
 
-  return { authRequired: env.INTENTS_AUTH_REQUIRED !== "false", rateLimit };
+  // Dropping the session check is for local work only; withdrawals move real
+  // money, so production always checks, whatever the env says.
+  const authRequired = env.INTENTS_AUTH_REQUIRED !== "false" || env.VERCEL_ENV === "production";
+  return { authRequired, rateLimit };
 }
 
 /** Fixed window per key. Per server instance, so on serverless it is a brake, not an exact count. */
@@ -68,7 +71,9 @@ export async function guardRequest(
     try {
       const { userId } = await deps.verify(token);
       caller = { userId, key: userId };
-    } catch {
+    } catch (err) {
+      // Privy unreachable is not the user's fault: saying "session expired" would send them to sign in for nothing.
+      if ((err as { name?: unknown } | null)?.name === "SessionCheckUnavailable") return deny(503, "Could not check your session");
       return deny(401, "Invalid session");
     }
   } else {
@@ -110,7 +115,7 @@ async function buildLimiter(rateLimit: NonNullable<GuardConfig["rateLimit"]>): P
   return createMemoryLimiter(rateLimit.limit, rateLimit.windowMs);
 }
 
-export type IntentsRoute = "tokens" | "quote" | "status";
+export type IntentsRoute = "tokens" | "quote" | "quote-dry" | "status" | "submit";
 
 /** Limits are counted per route, so status polling does not eat the quote budget. */
 export async function intentsGuard(request: Request, route: IntentsRoute): Promise<Caller | Response> {
@@ -128,4 +133,14 @@ export async function intentsGuard(request: Request, route: IntentsRoute): Promi
   const shared = sharedLimiter;
   const limiter: Limiter | null = shared ? (key) => shared(`${route}:${key}`) : null;
   return guardRequest(request, { config, verify: verifyPrivyToken, limiter });
+}
+
+/**
+ * Privy's SDK reports every verification failure as InvalidAuthTokenError; only
+ * the message says whether the token was bad or the check itself couldn't run
+ * (its catch-all also covers a timeout fetching the signing keys).
+ */
+export function sessionCheckFailure(err: unknown): "invalid" | "unavailable" {
+  const message = err instanceof Error ? err.message : "";
+  return /expired|is invalid/i.test(message) ? "invalid" : "unavailable";
 }

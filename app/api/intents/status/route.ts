@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auroraApiKey, auroraUrl } from "@/lib/intents/aurora";
 import { intentsGuard } from "@/lib/intents/guard";
+import { isPlausibleDepositAddress } from "@/lib/intents/status";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,9 @@ export async function GET(request: NextRequest) {
   if (!apiKey) return NextResponse.json({ error: "Deposits from other networks are not configured" }, { status: 503 });
 
   const depositAddress = request.nextUrl.searchParams.get("depositAddress");
-  if (!depositAddress) return NextResponse.json({ error: "Missing depositAddress" }, { status: 400 });
+  if (!depositAddress || !isPlausibleDepositAddress(depositAddress)) {
+    return NextResponse.json({ error: "Invalid depositAddress" }, { status: 400 });
+  }
 
   const query: Record<string, string> = { depositAddress };
   const depositMemo = request.nextUrl.searchParams.get("depositMemo");
@@ -29,7 +32,7 @@ export async function GET(request: NextRequest) {
       status: response.status,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Fetch failed" }, { status: 502 });
+  } catch {
+    return NextResponse.json({ error: "Could not reach Aurora" }, { status: 502 });
   }
 }

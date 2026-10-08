@@ -1,5 +1,7 @@
-import { isAddress, parseUnits } from "viem";
-import { USDC_BASE_ASSET_ID, type DepositAsset } from "./networks";
+import { getAddress, isAddress, parseUnits } from "viem";
+import { USDC_BASE_ASSET_ID, type DepositAsset, type WithdrawAsset } from "./networks";
+import { isValidNetworkAddress } from "./addresses";
+import { WithdrawError } from "./withdraw-errors";
 
 /** 1%. People top up from exchanges that shave fees off, so the exact amount rarely arrives. */
 export const DEPOSIT_SLIPPAGE_BPS = 100;
@@ -175,4 +177,241 @@ export function parseQuoteResponse(body: unknown): QuoteResult {
     deadline: quote.deadline,
     timeEstimate: quote.timeEstimate,
   };
+}
+
+/** 1%. Shown to the user as the guaranteed minimum on the review screen. */
+export const WITHDRAW_SLIPPAGE_BPS = 100;
+/** The transfer is signed seconds after quoting; half an hour covers a slow wallet prompt. */
+export const WITHDRAW_WINDOW_MS = 30 * 60 * 1000;
+/** Below this the transfer could land after the deadline and bounce back as a refund. */
+export const SIGN_MARGIN_MS = 5 * 60 * 1000;
+
+export interface WithdrawQuoteRequest {
+  dry: boolean;
+  swapType: "EXACT_INPUT";
+  slippageTolerance: number;
+  originAsset: string;
+  depositType: "ORIGIN_CHAIN";
+  destinationAsset: string;
+  amount: string;
+  recipient: string;
+  recipientType: "DESTINATION_CHAIN";
+  refundTo: string;
+  refundType: "ORIGIN_CHAIN";
+  deadline: string;
+}
+
+/**
+ * EXACT_INPUT: the user picks how much leaves their balance, so it can never
+ * exceed it; what arrives floats with the market, within the slippage. A failed
+ * conversion refunds to their own Base wallet, so it lands back in the balance.
+ */
+export function buildWithdrawQuoteRequest({
+  asset,
+  amount,
+  recipient,
+  refundTo,
+  dry,
+  now,
+}: {
+  asset: WithdrawAsset;
+  amount: bigint;
+  recipient: string;
+  refundTo: `0x${string}`;
+  dry: boolean;
+  now: Date;
+}): WithdrawQuoteRequest {
+  return {
+    dry,
+    swapType: "EXACT_INPUT",
+    slippageTolerance: WITHDRAW_SLIPPAGE_BPS,
+    originAsset: USDC_BASE_ASSET_ID,
+    depositType: "ORIGIN_CHAIN",
+    destinationAsset: asset.assetId,
+    amount: amount.toString(),
+    recipient: recipient.trim(),
+    recipientType: "DESTINATION_CHAIN",
+    refundTo,
+    refundType: "ORIGIN_CHAIN",
+    deadline: new Date(now.getTime() + WITHDRAW_WINDOW_MS).toISOString(),
+  };
+}
+
+/** Deposits end in USDC on Base; withdrawals start there. */
+export function isWithdrawalBody(body: unknown): boolean {
+  return typeof body === "object" && body !== null && (body as { originAsset?: unknown }).originAsset === USDC_BASE_ASSET_ID;
+}
+
+/**
+ * The only withdrawal shape the quote route forwards: USDC on Base out to one
+ * of the allowed assets, at a valid address on that asset's network, refunded
+ * to an EVM address (the route then checks it is the caller's). Returns a
+ * fresh object, so nothing extra (e.g. appFees) reaches Aurora on our key.
+ */
+export function validateWithdrawQuoteRequest(
+  body: unknown,
+  allowed: readonly WithdrawAsset[],
+  now: Date = new Date()
+): { request: WithdrawQuoteRequest; asset: WithdrawAsset } | null {
+  if (!body || typeof body !== "object") return null;
+  const r = body as Record<string, unknown>;
+
+  const asset = allowed.find((a) => a.assetId === r.destinationAsset);
+  if (!asset) return null;
+
+  const deadlineMs = typeof r.deadline === "string" ? Date.parse(r.deadline) : NaN;
+  const ok =
+    typeof r.dry === "boolean" &&
+    r.swapType === "EXACT_INPUT" &&
+    r.slippageTolerance === WITHDRAW_SLIPPAGE_BPS &&
+    r.originAsset === USDC_BASE_ASSET_ID &&
+    r.depositType === "ORIGIN_CHAIN" &&
+    typeof r.amount === "string" &&
+    /^\d+$/.test(r.amount) &&
+    BigInt(r.amount) > 0n &&
+    typeof r.recipient === "string" &&
+    r.recipient === r.recipient.trim() &&
+    isValidNetworkAddress(asset.network, r.recipient) &&
+    r.recipientType === "DESTINATION_CHAIN" &&
+    r.refundType === "ORIGIN_CHAIN" &&
+    typeof r.refundTo === "string" &&
+    isAddress(r.refundTo) &&
+    deadlineMs > now.getTime() &&
+    deadlineMs <= now.getTime() + MAX_DEADLINE_MS;
+  if (!ok) return null;
+
+  return {
+    asset,
+    request: {
+      dry: r.dry as boolean,
+      swapType: "EXACT_INPUT",
+      slippageTolerance: WITHDRAW_SLIPPAGE_BPS,
+      originAsset: USDC_BASE_ASSET_ID,
+      depositType: "ORIGIN_CHAIN",
+      destinationAsset: asset.assetId,
+      amount: r.amount as string,
+      recipient: r.recipient as string,
+      recipientType: "DESTINATION_CHAIN",
+      refundTo: r.refundTo as string,
+      refundType: "ORIGIN_CHAIN",
+      deadline: r.deadline as string,
+    },
+  };
+}
+
+export interface WithdrawEstimate {
+  /** Smallest unit of the destination asset. */
+  amountOut: string;
+  amountOutFormatted: string;
+  /** Smallest unit; what slippage still guarantees. */
+  minAmountOut: string;
+  amountInUsd?: string;
+  amountOutUsd?: string;
+  timeEstimate: number;
+}
+
+export interface WithdrawQuote extends WithdrawEstimate {
+  depositAddress: string;
+  /** Smallest unit of USDC; exactly what gets signed. */
+  amountIn: string;
+  amountInFormatted: string;
+  deadline: string;
+}
+
+function quoteObject(body: unknown): Record<string, unknown> {
+  const quote = (body as { quote?: unknown } | null)?.quote;
+  if (!quote || typeof quote !== "object") throw new Error("Aurora returned no quote");
+  return quote as Record<string, unknown>;
+}
+
+/** Dry quotes carry no address or deadline (Aurora's docs), only the price. */
+export function parseWithdrawEstimate(body: unknown): WithdrawEstimate {
+  const quote = quoteObject(body);
+  for (const field of ["amountOut", "amountOutFormatted", "minAmountOut"] as const) {
+    if (typeof quote[field] !== "string") throw new Error(`Aurora returned no ${field}`);
+  }
+  // These feed BigInt() later; a non-integer would throw there or compare wrongly.
+  for (const field of ["amountOut", "minAmountOut"] as const) {
+    if (!/^\d+$/.test(quote[field] as string)) throw new Error(`Aurora returned an invalid ${field}`);
+  }
+  if (typeof quote.timeEstimate !== "number" || !Number.isFinite(quote.timeEstimate)) {
+    throw new Error("Aurora returned an invalid timeEstimate");
+  }
+  const estimate: WithdrawEstimate = {
+    amountOut: quote.amountOut as string,
+    amountOutFormatted: quote.amountOutFormatted as string,
+    minAmountOut: quote.minAmountOut as string,
+    timeEstimate: quote.timeEstimate,
+  };
+  if (typeof quote.amountInUsd === "string") estimate.amountInUsd = quote.amountInUsd;
+  if (typeof quote.amountOutUsd === "string") estimate.amountOutUsd = quote.amountOutUsd;
+  return estimate;
+}
+
+const ECHOED_FIELDS = ["originAsset", "destinationAsset", "amount", "recipient", "refundTo"] as const;
+
+function sameEvmAddress(a: unknown, b: string): boolean {
+  if (typeof a !== "string") return false;
+  try {
+    return getAddress(a) === getAddress(b);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Aurora may echo an EVM address in another case (e.g. checksummed), which is
+ * the same address; everything else must match exactly.
+ */
+function echoMatches(field: (typeof ECHOED_FIELDS)[number], echoed: unknown, sent: WithdrawQuoteRequest): boolean {
+  const isEvmField = field === "refundTo" || (field === "recipient" && isAddress(sent.recipient));
+  return isEvmField ? sameEvmAddress(echoed, sent[field]) : echoed === sent[field];
+}
+
+/**
+ * The live quote decides where the user's money goes, so before anything is
+ * signed it must be for exactly what was asked: Aurora echoes the request, and
+ * every field that moves money is compared. Any difference stops the
+ * withdrawal rather than signing something the user did not review.
+ */
+export function parseWithdrawQuote(body: unknown, sent: WithdrawQuoteRequest): WithdrawQuote {
+  const echoed = (body as { quoteRequest?: Record<string, unknown> } | null)?.quoteRequest;
+  if (!echoed || ECHOED_FIELDS.some((field) => !echoMatches(field, echoed[field], sent))) throw new WithdrawError("mismatch");
+
+  const estimate = parseWithdrawEstimate(body);
+  const quote = quoteObject(body);
+  if (typeof quote.depositAddress !== "string" || !isAddress(quote.depositAddress)) throw new WithdrawError("mismatch");
+  if (typeof quote.amountIn !== "string" || !/^\d+$/.test(quote.amountIn) || quote.amountIn !== sent.amount) throw new WithdrawError("mismatch");
+  if (typeof quote.amountInFormatted !== "string") throw new Error("Aurora returned no amountInFormatted");
+  if (typeof quote.deadline !== "string" || Number.isNaN(Date.parse(quote.deadline))) {
+    throw new Error("Aurora returned an invalid deadline");
+  }
+
+  return {
+    ...estimate,
+    depositAddress: quote.depositAddress,
+    amountIn: quote.amountIn,
+    amountInFormatted: quote.amountInFormatted,
+    deadline: quote.deadline,
+  };
+}
+
+/** 0.1%: prices move every few seconds, and asking again over less only loops the user. */
+export const QUOTE_DRIFT_BPS = 10n;
+
+/**
+ * The live quote is fetched on confirm, a moment after the user read the
+ * estimate. It is signed without asking again only if the minimum it now
+ * enforces is within QUOTE_DRIFT_BPS of the "Guaranteed minimum" the user read.
+ */
+export function quoteStillHolds(shown: WithdrawEstimate, quote: WithdrawQuote): boolean {
+  return BigInt(quote.minAmountOut) * 10_000n >= BigInt(shown.minAmountOut) * (10_000n - QUOTE_DRIFT_BPS);
+}
+
+/** Network and conversion cost in dollars, as Aurora prices both sides. Null when it did not say. */
+export function conversionCostUsd(estimate: WithdrawEstimate): string | null {
+  if (estimate.amountInUsd === undefined || estimate.amountOutUsd === undefined) return null;
+  const cost = Number(estimate.amountInUsd) - Number(estimate.amountOutUsd);
+  if (!Number.isFinite(cost)) return null;
+  return Math.max(0, cost).toFixed(2);
 }

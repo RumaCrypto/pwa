@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { IntentsApiError, fetchDepositStatus, requestDepositQuote } from "./api";
-import type { QuoteRequest } from "./quote";
+import {
+  IntentsApiError,
+  fetchDepositStatus,
+  fetchTokens,
+  requestDepositQuote,
+  requestWithdrawEstimate,
+  requestWithdrawQuote,
+  submitDepositTx,
+} from "./api";
+import { parseWithdrawEstimate, type QuoteRequest } from "./quote";
 
 const json = (status: number, body: unknown) =>
   vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
@@ -51,5 +59,53 @@ describe("fetchDepositStatus", () => {
     expect(fetchImpl).toHaveBeenCalledWith("/api/intents/status?depositAddress=TXyz", {
       headers: { Authorization: "Bearer tok" },
     });
+  });
+});
+
+describe("withdrawal calls", () => {
+  const request = { amount: "1", recipient: "r", refundTo: "0x1", originAsset: "o", destinationAsset: "d" } as never;
+  const ok = (body: unknown) => vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }));
+
+  it("asks the dry route for estimates and passes the abort signal", async () => {
+    const fetchImpl = ok({ quote: { amountOut: "1", amountOutFormatted: "1", minAmountOut: "1", timeEstimate: 1 } });
+    const signal = new AbortController().signal;
+    const estimate = await requestWithdrawEstimate(request, "tok", signal, fetchImpl as never);
+    expect(estimate).toEqual(parseWithdrawEstimate({ quote: { amountOut: "1", amountOutFormatted: "1", minAmountOut: "1", timeEstimate: 1 } }));
+    expect(fetchImpl).toHaveBeenCalledWith("/api/intents/quote/dry", expect.objectContaining({ method: "POST", signal }));
+  });
+
+  it("posts the tx hash and deposit address to the submit route", async () => {
+    const fetchImpl = ok({});
+    const txHash = `0x${"ab".repeat(32)}`;
+    const depositAddress = "0x9f3a00000000000000000000000000000000c21e";
+    await submitDepositTx(txHash, depositAddress, "tok", fetchImpl as never);
+    const init = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(JSON.parse(init.body as string)).toEqual({ txHash, depositAddress });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/api/intents/submit",
+      expect.objectContaining({ method: "POST", headers: expect.objectContaining({ Authorization: "Bearer tok" }) })
+    );
+  });
+
+  it("raises IntentsApiError with the status on refusal", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ error: "Recipient is a token contract" }), { status: 422 }));
+    await expect(requestWithdrawQuote(request, "tok", fetchImpl as never)).rejects.toMatchObject({ status: 422 });
+  });
+});
+
+describe("fetchTokens", () => {
+  const TOKEN = { assetId: "nep141:wrap.near", decimals: 24, blockchain: "near", symbol: "wNEAR", price: 5, contractAddress: "wrap.near" };
+
+  it("unwraps the token list from Aurora's { asset_stats, tokens } envelope", async () => {
+    const tokens = await fetchTokens("tok", json(200, { asset_stats: [], tokens: [TOKEN] }));
+    expect(tokens).toEqual([TOKEN]);
+  });
+
+  it("still accepts a bare array", async () => {
+    expect(await fetchTokens("tok", json(200, [TOKEN]))).toEqual([TOKEN]);
+  });
+
+  it("fails loudly on a body with no token list", async () => {
+    await expect(fetchTokens("tok", json(200, { asset_stats: [] }))).rejects.toThrow(/token list/);
   });
 });

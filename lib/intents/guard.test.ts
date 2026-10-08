@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryLimiter, guardRequest, readGuardConfig, redisCredentials, type GuardConfig } from "./guard";
+import { createMemoryLimiter, guardRequest, readGuardConfig, redisCredentials, sessionCheckFailure, type GuardConfig } from "./guard";
 
 describe("readGuardConfig", () => {
   it("requires a session and limits to 30 per minute by default", () => {
@@ -16,6 +16,13 @@ describe("readGuardConfig", () => {
   it("turns the limit off with 'off' and falls back to the default on garbage", () => {
     expect(readGuardConfig({ INTENTS_RATE_LIMIT: "off" }).rateLimit).toBeNull();
     expect(readGuardConfig({ INTENTS_RATE_LIMIT: "lots" }).rateLimit).toEqual({ limit: 30, windowMs: 60_000 });
+  });
+});
+
+describe("readGuardConfig in production", () => {
+  it("never drops the session check in production, whatever the env says", () => {
+    expect(readGuardConfig({ INTENTS_AUTH_REQUIRED: "false", VERCEL_ENV: "production" }).authRequired).toBe(true);
+    expect(readGuardConfig({ INTENTS_AUTH_REQUIRED: "false", VERCEL_ENV: "preview" }).authRequired).toBe(false);
   });
 });
 
@@ -49,6 +56,15 @@ describe("guardRequest", () => {
     expect(((await guardRequest(req(), { config: on, verify, limiter: null })) as Response).status).toBe(401);
     const bad = req({ Authorization: "Bearer nope" });
     expect(((await guardRequest(bad, { config: on, verify, limiter: null })) as Response).status).toBe(401);
+  });
+
+  it("answers 503, not 401, when the session could not be checked (Privy unreachable)", async () => {
+    const unreachable = vi.fn(async () => {
+      throw Object.assign(new Error("jwks timeout"), { name: "SessionCheckUnavailable" });
+    });
+    const res = (await guardRequest(req({ Authorization: "Bearer good" }), { config: on, verify: unreachable, limiter: null })) as Response;
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "Could not check your session" });
   });
 
   it("lets a valid session through, keyed by user", async () => {
@@ -89,5 +105,17 @@ describe("redisCredentials", () => {
     expect(redisCredentials({})).toBeNull();
     expect(redisCredentials({ UPSTASH_REDIS_REST_URL: "https://u" })).toBeNull();
     expect(redisCredentials({ KV_REST_API_TOKEN: "k" })).toBeNull();
+  });
+});
+
+describe("sessionCheckFailure", () => {
+  it("treats an expired or malformed token as the user's session problem", () => {
+    expect(sessionCheckFailure(new Error("Authentication token expired"))).toBe("invalid");
+    expect(sessionCheckFailure(new Error("Authentication token is invalid"))).toBe("invalid");
+  });
+
+  it("treats Privy's catch-all (key fetch timeout, network) as a check that couldn't run", () => {
+    expect(sessionCheckFailure(new Error("Failed to verify authentication token"))).toBe("unavailable");
+    expect(sessionCheckFailure(new TypeError("fetch failed"))).toBe("unavailable");
   });
 });

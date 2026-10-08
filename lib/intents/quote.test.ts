@@ -1,13 +1,24 @@
+import { getAddress } from "viem";
 import { describe, expect, it } from "vitest";
 import {
   DEPOSIT_SLIPPAGE_BPS,
+  SIGN_MARGIN_MS,
+  WITHDRAW_SLIPPAGE_BPS,
   buildQuoteRequest,
+  buildWithdrawQuoteRequest,
+  conversionCostUsd,
+  isWithdrawalBody,
   parseAmount,
   parseQuoteResponse,
+  parseWithdrawEstimate,
+  parseWithdrawQuote,
+  quoteStillHolds,
   refundModeFrom,
   validateQuoteRequest,
+  validateWithdrawQuoteRequest,
 } from "./quote";
-import { USDC_BASE_ASSET_ID, type DepositAsset } from "./networks";
+import { WithdrawError } from "./withdraw-errors";
+import { USDC_BASE_ASSET_ID, type DepositAsset, type WithdrawAsset } from "./networks";
 
 const USDT_TRON: DepositAsset = {
   assetId: "nep141:tron-d28a265909efecdcee7c5028585214ea0b96f015.omft.near",
@@ -178,4 +189,209 @@ describe("parseQuoteResponse", () => {
     expect(() => parseQuoteResponse({ ...body, quote: { ...body.quote, timeEstimate: "fast" } })).toThrow(/timeEstimate/);
     expect(() => parseQuoteResponse({ ...body, quote: { ...body.quote, timeEstimate: undefined } })).toThrow(/timeEstimate/);
   });
+});
+
+const W_USDT_TRON: WithdrawAsset = {
+  assetId: "nep141:tron-d28a265909efecdcee7c5028585214ea0b96f015.omft.near",
+  symbol: "USDT",
+  decimals: 6,
+  priceUsd: 1,
+  network: "tron",
+  contractAddress: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+};
+const OWNER = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" as const;
+const TRON_TO = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+const W_NOW = new Date("2026-10-04T12:00:00Z");
+
+const withdrawal = (dry = false) =>
+  buildWithdrawQuoteRequest({ asset: W_USDT_TRON, amount: 50_000_000n, recipient: ` ${TRON_TO} `, refundTo: OWNER, dry, now: W_NOW });
+
+describe("buildWithdrawQuoteRequest", () => {
+  it("sends exact USDC from Base and refunds to the user's own Base wallet", () => {
+    expect(withdrawal()).toEqual({
+      dry: false,
+      swapType: "EXACT_INPUT",
+      slippageTolerance: WITHDRAW_SLIPPAGE_BPS,
+      originAsset: USDC_BASE_ASSET_ID,
+      depositType: "ORIGIN_CHAIN",
+      destinationAsset: W_USDT_TRON.assetId,
+      amount: "50000000",
+      recipient: TRON_TO,
+      recipientType: "DESTINATION_CHAIN",
+      refundTo: OWNER,
+      refundType: "ORIGIN_CHAIN",
+      deadline: "2026-10-04T12:30:00.000Z",
+    });
+  });
+
+  it("is told apart from a deposit by its origin", () => {
+    expect(isWithdrawalBody(withdrawal())).toBe(true);
+    expect(isWithdrawalBody({ originAsset: "nep141:btc.omft.near" })).toBe(false);
+    expect(isWithdrawalBody(null)).toBe(false);
+  });
+});
+
+describe("validateWithdrawQuoteRequest", () => {
+  const allowed = [W_USDT_TRON];
+
+  it("passes what the app builds, dry or live, and names the asset", () => {
+    expect(validateWithdrawQuoteRequest(withdrawal(), allowed, W_NOW)).toEqual({ request: withdrawal(), asset: W_USDT_TRON });
+    expect(validateWithdrawQuoteRequest(withdrawal(true), allowed, W_NOW)?.request.dry).toBe(true);
+  });
+
+  it("strips unknown fields", () => {
+    const result = validateWithdrawQuoteRequest({ ...withdrawal(), appFees: [{ recipient: "x", fee: 9999 }] }, allowed, W_NOW);
+    expect(result?.request).not.toHaveProperty("appFees");
+  });
+
+  it("refuses anything but USDC on Base as the origin", () => {
+    expect(validateWithdrawQuoteRequest({ ...withdrawal(), originAsset: "nep141:eth.omft.near" }, allowed, W_NOW)).toBeNull();
+  });
+
+  it("refuses a destination outside the allow-list", () => {
+    expect(validateWithdrawQuoteRequest({ ...withdrawal(), destinationAsset: "nep141:eth.omft.near" }, allowed, W_NOW)).toBeNull();
+  });
+
+  it("refuses a recipient that is not a valid address on the destination network", () => {
+    expect(validateWithdrawQuoteRequest({ ...withdrawal(), recipient: OWNER }, allowed, W_NOW)).toBeNull();
+    expect(validateWithdrawQuoteRequest({ ...withdrawal(), recipient: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6u" }, allowed, W_NOW)).toBeNull();
+  });
+
+  it("refuses refunds anywhere but an EVM address on the origin chain", () => {
+    expect(validateWithdrawQuoteRequest({ ...withdrawal(), refundType: "INTENTS" }, allowed, W_NOW)).toBeNull();
+    expect(validateWithdrawQuoteRequest({ ...withdrawal(), refundTo: TRON_TO }, allowed, W_NOW)).toBeNull();
+  });
+
+  it("refuses another swap type, slippage, zero amount or a deadline out of range", () => {
+    expect(validateWithdrawQuoteRequest({ ...withdrawal(), swapType: "FLEX_INPUT" }, allowed, W_NOW)).toBeNull();
+    expect(validateWithdrawQuoteRequest({ ...withdrawal(), slippageTolerance: 5000 }, allowed, W_NOW)).toBeNull();
+    expect(validateWithdrawQuoteRequest({ ...withdrawal(), amount: "0" }, allowed, W_NOW)).toBeNull();
+    expect(validateWithdrawQuoteRequest({ ...withdrawal(), deadline: "2026-10-04T11:59:00Z" }, allowed, W_NOW)).toBeNull();
+    expect(validateWithdrawQuoteRequest({ ...withdrawal(), deadline: "2026-10-04T15:00:00Z" }, allowed, W_NOW)).toBeNull();
+  });
+});
+
+const QUOTE_BODY = {
+  quoteRequest: withdrawal(),
+  quote: {
+    depositAddress: "0x9f3a00000000000000000000000000000000c21e",
+    amountIn: "50000000",
+    amountInFormatted: "50.0",
+    amountInUsd: "50.00",
+    amountOut: "49820000",
+    amountOutFormatted: "49.82",
+    amountOutUsd: "49.82",
+    minAmountOut: "49321800",
+    deadline: "2026-10-04T12:30:00.000Z",
+    timeEstimate: 60,
+  },
+};
+
+describe("parseWithdrawEstimate", () => {
+  it("keeps what the form shows and needs no address or deadline", () => {
+    const { depositAddress, deadline, ...dryQuote } = QUOTE_BODY.quote;
+    expect(parseWithdrawEstimate({ quote: dryQuote })).toEqual({
+      amountOut: "49820000",
+      amountOutFormatted: "49.82",
+      minAmountOut: "49321800",
+      amountInUsd: "50.00",
+      amountOutUsd: "49.82",
+      timeEstimate: 60,
+    });
+    void depositAddress;
+    void deadline;
+  });
+
+  it("fails loudly when amounts are missing", () => {
+    expect(() => parseWithdrawEstimate({ quote: { timeEstimate: 1 } })).toThrow();
+  });
+
+  it("rejects amounts that are not plain integers", () => {
+    for (const field of ["amountOut", "minAmountOut"] as const) {
+      for (const bad of ["49.82", "-1", "1e6", "", "abc"]) {
+        expect(() => parseWithdrawEstimate({ quote: { ...QUOTE_BODY.quote, [field]: bad } })).toThrow(/invalid/);
+      }
+    }
+  });
+});
+
+describe("parseWithdrawQuote", () => {
+  it("returns the live quote when Aurora echoes exactly what was sent", () => {
+    expect(parseWithdrawQuote(QUOTE_BODY, withdrawal())).toMatchObject({
+      depositAddress: QUOTE_BODY.quote.depositAddress,
+      amountIn: "50000000",
+      deadline: "2026-10-04T12:30:00.000Z",
+    });
+  });
+
+  it("refuses a quote for another recipient, asset, amount or refund address", () => {
+    for (const field of ["recipient", "destinationAsset", "originAsset", "amount", "refundTo"] as const) {
+      const body = { ...QUOTE_BODY, quoteRequest: { ...withdrawal(), [field]: "something-else" } };
+      expect(() => parseWithdrawQuote(body, withdrawal())).toThrow(WithdrawError);
+    }
+  });
+
+  it("accepts an EVM address echoed in another case, but not a different one", () => {
+    const checksummed = getAddress(OWNER);
+    const sent = withdrawal();
+    expect(parseWithdrawQuote({ ...QUOTE_BODY, quoteRequest: { ...sent, refundTo: checksummed } }, sent)).toBeTruthy();
+    const other = getAddress("0x5aeda56215b167893e80b4fe645ba6d5bab767de");
+    expect(() => parseWithdrawQuote({ ...QUOTE_BODY, quoteRequest: { ...sent, refundTo: other } }, sent)).toThrow(WithdrawError);
+    expect(() => parseWithdrawQuote({ ...QUOTE_BODY, quoteRequest: { ...sent, refundTo: "not-an-address" } }, sent)).toThrow(WithdrawError);
+  });
+
+  it("compares an EVM recipient case-insensitively and a non-EVM one exactly", () => {
+    const evmSent = { ...withdrawal(), recipient: OWNER };
+    expect(parseWithdrawQuote({ ...QUOTE_BODY, quoteRequest: { ...evmSent, recipient: getAddress(OWNER) } }, evmSent)).toBeTruthy();
+    const sent = withdrawal();
+    expect(() => parseWithdrawQuote({ ...QUOTE_BODY, quoteRequest: { ...sent, recipient: TRON_TO.toLowerCase() } }, sent)).toThrow(WithdrawError);
+  });
+
+  it("refuses an amountIn that is not a plain integer", () => {
+    const sent = { ...withdrawal(), amount: "5e7" };
+    const body = { quoteRequest: sent, quote: { ...QUOTE_BODY.quote, amountIn: "5e7" } };
+    expect(() => parseWithdrawQuote(body, sent)).toThrow(WithdrawError);
+  });
+
+  it("refuses an amountIn that differs from the request, or a deposit address that is not on Base", () => {
+    expect(() => parseWithdrawQuote({ ...QUOTE_BODY, quote: { ...QUOTE_BODY.quote, amountIn: "50000001" } }, withdrawal())).toThrow(WithdrawError);
+    expect(() => parseWithdrawQuote({ ...QUOTE_BODY, quote: { ...QUOTE_BODY.quote, depositAddress: TRON_TO } }, withdrawal())).toThrow(WithdrawError);
+  });
+});
+
+describe("quoteStillHolds", () => {
+  const shown = parseWithdrawEstimate(QUOTE_BODY);
+
+  it("holds while the live minimum is at least the one the user was shown", () => {
+    const quote = parseWithdrawQuote(QUOTE_BODY, withdrawal());
+    expect(quoteStillHolds(shown, quote)).toBe(true);
+  });
+
+  it("tolerates drift up to 0.1%, since prices move every few seconds between estimate and quote", () => {
+    const quote = parseWithdrawQuote(QUOTE_BODY, withdrawal());
+    // shown minimum is 49321800; 0.1% below is 49272478.2
+    expect(quoteStillHolds(shown, { ...quote, minAmountOut: "49321799" })).toBe(true);
+    expect(quoteStillHolds(shown, { ...quote, minAmountOut: "49272479" })).toBe(true);
+    expect(quoteStillHolds(shown, { ...quote, minAmountOut: "49272478" })).toBe(false);
+  });
+
+  it("asks again when the enforced minimum drops further, even if the expected amount is fine", () => {
+    const quote = parseWithdrawQuote(QUOTE_BODY, withdrawal());
+    expect(quoteStillHolds(shown, { ...quote, amountOut: "49900000", minAmountOut: "49000000" })).toBe(false);
+  });
+});
+
+describe("conversionCostUsd", () => {
+  it("is what goes in minus what comes out, in dollars", () => {
+    expect(conversionCostUsd(parseWithdrawEstimate(QUOTE_BODY))).toBe("0.18");
+  });
+
+  it("is unknown without USD values and never negative", () => {
+    expect(conversionCostUsd({ ...parseWithdrawEstimate(QUOTE_BODY), amountInUsd: undefined })).toBeNull();
+    expect(conversionCostUsd({ ...parseWithdrawEstimate(QUOTE_BODY), amountOutUsd: "51" })).toBe("0.00");
+  });
+});
+
+it("leaves at least five minutes to sign", () => {
+  expect(SIGN_MARGIN_MS).toBe(5 * 60 * 1000);
 });
