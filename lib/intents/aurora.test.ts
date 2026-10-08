@@ -31,6 +31,11 @@ describe("auroraUrl for deposit submissions", () => {
 });
 
 describe("fetchAuroraTokens", () => {
+  it("unwraps Aurora's real { asset_stats, tokens } envelope", async () => {
+    const fetchImpl = async () => new Response(JSON.stringify({ asset_stats: [], tokens: [{ assetId: "a" }] }), { status: 200 });
+    expect(await fetchAuroraTokens("k", fetchImpl as never)).toEqual([{ assetId: "a" }]);
+  });
+
   it("returns the token list", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify([{ assetId: "a" }]), { status: 200 }));
     expect(await fetchAuroraTokens("k", fetchImpl as never)).toEqual([{ assetId: "a" }]);

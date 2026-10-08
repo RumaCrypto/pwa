@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NETWORKS, assetsForNetwork, findNetwork, isNetworkId, withdrawAssetsForNetwork, allWithdrawAssets, type IntentsToken } from "./networks";
+import { NETWORKS, assetsForNetwork, findNetwork, isNetworkId, withdrawAssetsForNetwork, allWithdrawAssets, tokenList, type IntentsToken } from "./networks";
 
 const token = (blockchain: string, symbol: string, assetId: string, decimals = 6): IntentsToken => ({
   assetId,
@@ -87,5 +87,20 @@ describe("allWithdrawAssets", () => {
     expect(ids).toContain("nep141:btc.omft.near");
     expect(ids).not.toContain("nep141:eth.omft.near");
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("tokenList", () => {
+  const TOKEN = { assetId: "a" };
+
+  it("accepts Aurora's envelope and a bare array", () => {
+    expect(tokenList({ asset_stats: [], tokens: [TOKEN] })).toEqual([TOKEN]);
+    expect(tokenList([TOKEN])).toEqual([TOKEN]);
+  });
+
+  it("returns null when there is no list", () => {
+    expect(tokenList({ asset_stats: [] })).toBeNull();
+    expect(tokenList(null)).toBeNull();
+    expect(tokenList("x")).toBeNull();
   });
 });

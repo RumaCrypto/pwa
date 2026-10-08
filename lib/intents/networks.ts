@@ -79,6 +79,15 @@ const WITHDRAW_SYMBOLS: Record<NetworkId, readonly string[]> = {
 
 const DISPLAY_SYMBOL: Record<string, string> = { wNEAR: "NEAR" };
 
+/**
+ * Aurora's token endpoint answers { asset_stats, tokens }; a bare array is also
+ * accepted so the client and server parse the list the same way.
+ */
+export function tokenList(body: unknown): IntentsToken[] | null {
+  const list = Array.isArray(body) ? body : (body as { tokens?: unknown } | null)?.tokens;
+  return Array.isArray(list) ? (list as IntentsToken[]) : null;
+}
+
 export function isNetworkId(value: string): value is NetworkId {
   return NETWORKS.some((network) => network.id === value);
 }

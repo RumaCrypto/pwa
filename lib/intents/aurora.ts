@@ -1,5 +1,5 @@
 import "server-only";
-import type { IntentsToken } from "./networks";
+import { tokenList, type IntentsToken } from "./networks";
 
 export const AURORA_API_URL = "https://intents-api.aurora.dev";
 
@@ -26,7 +26,7 @@ export async function fetchAuroraTokens(apiKey: string, fetchImpl: typeof fetch 
     signal: AbortSignal.timeout(8000),
   } as RequestInit);
   if (!response.ok) throw new Error(`Aurora tokens answered ${response.status}`);
-  const body: unknown = await response.json();
-  if (!Array.isArray(body)) throw new Error("Aurora tokens is not a list");
-  return body as IntentsToken[];
+  const tokens = tokenList(await response.json());
+  if (!tokens) throw new Error("Aurora tokens is not a list");
+  return tokens;
 }
