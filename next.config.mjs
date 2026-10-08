@@ -8,6 +8,9 @@ import { spawnSync } from "node:child_process";
 const revision = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf-8" }).stdout ?? crypto.randomUUID();
 
 const withSerwist = withSerwistInit({
+  // A SW in `next dev` serves stale precached pages/RSC payloads across HMR
+  // rebuilds, which makes Next hard-reload forever.
+  disable: process.env.NODE_ENV === "development",
   cacheOnNavigation: true,
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
