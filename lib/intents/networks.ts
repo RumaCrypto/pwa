@@ -12,10 +12,14 @@ export interface Network {
   logo: string;
 }
 
+/**
+ * Optimism ("op") stays a NetworkId, with its address and explorer support, but
+ * isn't offered: Aurora answers "Quoting for this pair is not available" for
+ * every asset on it, in both directions. Add it back here once it quotes.
+ */
 export const NETWORKS: readonly Network[] = [
   { id: "eth", name: "Ethereum", logo: "/networks/eth.svg" },
   { id: "arb", name: "Arbitrum", logo: "/networks/arb.svg" },
-  { id: "op", name: "Optimism", logo: "/networks/op.svg" },
   { id: "tron", name: "Tron", logo: "/networks/tron.svg" },
   { id: "btc", name: "Bitcoin", logo: "/networks/btc.svg" },
   { id: "near", name: "NEAR", logo: "/networks/near.svg" },
@@ -97,8 +101,11 @@ export function isNetworkId(value: string): value is NetworkId {
   return NETWORKS.some((network) => network.id === value);
 }
 
+/** Networks known but not offered; records made on them must still render. */
+const UNOFFERED: readonly Network[] = [{ id: "op", name: "Optimism", logo: "/networks/op.svg" }];
+
 export function findNetwork(id: NetworkId): Network {
-  return NETWORKS.find((network) => network.id === id)!;
+  return [...NETWORKS, ...UNOFFERED].find((network) => network.id === id)!;
 }
 
 function pickTokens(tokens: readonly IntentsToken[], network: NetworkId, symbols: readonly string[]): IntentsToken[] {
