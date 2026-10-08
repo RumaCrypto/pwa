@@ -362,15 +362,22 @@ describe("parseWithdrawQuote", () => {
 describe("quoteStillHolds", () => {
   const shown = parseWithdrawEstimate(QUOTE_BODY);
 
-  it("holds while the live amount out is at least the minimum the user was shown", () => {
+  it("holds while the live minimum is at least the one the user was shown", () => {
     const quote = parseWithdrawQuote(QUOTE_BODY, withdrawal());
     expect(quoteStillHolds(shown, quote)).toBe(true);
-    expect(quoteStillHolds(shown, { ...quote, minAmountOut: "49321799" })).toBe(false);
   });
 
-  it("asks again when the enforced minimum drops below the one shown, even if the expected amount is fine", () => {
+  it("tolerates drift up to 0.1%, since prices move every few seconds between estimate and quote", () => {
     const quote = parseWithdrawQuote(QUOTE_BODY, withdrawal());
-    expect(quoteStillHolds(shown, { ...quote, amountOut: "49900000", minAmountOut: "49321799" })).toBe(false);
+    // shown minimum is 49321800; 0.1% below is 49272478.2
+    expect(quoteStillHolds(shown, { ...quote, minAmountOut: "49321799" })).toBe(true);
+    expect(quoteStillHolds(shown, { ...quote, minAmountOut: "49272479" })).toBe(true);
+    expect(quoteStillHolds(shown, { ...quote, minAmountOut: "49272478" })).toBe(false);
+  });
+
+  it("asks again when the enforced minimum drops further, even if the expected amount is fine", () => {
+    const quote = parseWithdrawQuote(QUOTE_BODY, withdrawal());
+    expect(quoteStillHolds(shown, { ...quote, amountOut: "49900000", minAmountOut: "49000000" })).toBe(false);
   });
 });
 

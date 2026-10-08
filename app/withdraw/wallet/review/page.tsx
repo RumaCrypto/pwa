@@ -32,6 +32,27 @@ import { findActiveWithdrawal, isOwnIntentAddress, type IntentWithdrawal } from 
 import { coversGas, executeWithdrawal } from "@/lib/intents/withdraw-execution";
 import { baseTxUrl } from "@/lib/intents/explorers";
 
+/** Whether `from` holds enough ETH on Base to pay gas for a USDC transfer of `value` to `to`. */
+async function hasGasFor(from: Address, to: Address, value: bigint): Promise<boolean> {
+  try {
+    const [gas, fees, eth] = await Promise.all([
+      baseClient.estimateContractGas({
+        address: USDC_ADDRESS_BASE,
+        abi: erc20TransferAbi,
+        functionName: "transfer",
+        args: [to, value],
+        account: from,
+      }),
+      baseClient.estimateFeesPerGas(),
+      baseClient.getBalance({ address: from }),
+    ]);
+    return coversGas(eth, gas, fees.maxFeePerGas);
+  } catch {
+    // The check is a courtesy: if the RPC can't answer, signing still reports missing gas.
+    return true;
+  }
+}
+
 export default function WithdrawReviewPage() {
   if (!FLAGS.multichainDeposits) notFound();
   return <WithdrawReview />;
@@ -104,6 +125,10 @@ function WithdrawReview() {
         return;
       }
 
+      // Before the live quote, so a wallet without ETH hears about it first; a
+      // transfer to itself costs the same gas as one to the deposit address.
+      if (!(await hasGasFor(owner, owner, amount))) throw new WithdrawError("gas");
+
       const token = await getAccessToken();
       const request = buildWithdrawQuoteRequest({
         asset: draft.asset,
@@ -130,25 +155,7 @@ function WithdrawReview() {
           now: () => new Date(),
           readBalance: () =>
             baseClient.readContract({ address: USDC_ADDRESS_BASE, abi: erc20BalanceOfAbi, functionName: "balanceOf", args: [address] }),
-          hasGasFor: async (to: Address, value: bigint) => {
-            try {
-              const [gas, fees, eth] = await Promise.all([
-                baseClient.estimateContractGas({
-                  address: USDC_ADDRESS_BASE,
-                  abi: erc20TransferAbi,
-                  functionName: "transfer",
-                  args: [to, value],
-                  account: address,
-                }),
-                baseClient.estimateFeesPerGas(),
-                baseClient.getBalance({ address }),
-              ]);
-              return coversGas(eth, gas, fees.maxFeePerGas);
-            } catch {
-              // The check is a courtesy: if the RPC can't answer, signing still reports missing gas.
-              return true;
-            }
-          },
+          hasGasFor: (to: Address, value: bigint) => hasGasFor(address, to, value),
           transfer: (to: Address, value: bigint) =>
             walletClient.writeContract({
               address: USDC_ADDRESS_BASE,

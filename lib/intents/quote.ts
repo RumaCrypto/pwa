@@ -396,13 +396,16 @@ export function parseWithdrawQuote(body: unknown, sent: WithdrawQuoteRequest): W
   };
 }
 
+/** 0.1%: prices move every few seconds, and asking again over less only loops the user. */
+export const QUOTE_DRIFT_BPS = 10n;
+
 /**
  * The live quote is fetched on confirm, a moment after the user read the
  * estimate. It is signed without asking again only if the minimum it now
- * enforces is at least the "Guaranteed minimum" the user read.
+ * enforces is within QUOTE_DRIFT_BPS of the "Guaranteed minimum" the user read.
  */
 export function quoteStillHolds(shown: WithdrawEstimate, quote: WithdrawQuote): boolean {
-  return BigInt(quote.minAmountOut) >= BigInt(shown.minAmountOut);
+  return BigInt(quote.minAmountOut) * 10_000n >= BigInt(shown.minAmountOut) * (10_000n - QUOTE_DRIFT_BPS);
 }
 
 /** Network and conversion cost in dollars, as Aurora prices both sides. Null when it did not say. */
