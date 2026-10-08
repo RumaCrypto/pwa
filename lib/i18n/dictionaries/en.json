@@ -372,6 +372,7 @@
   "home.addMoney": "Add money",
   "home.withdrawMoney": "Take money out",
   "home.copyAddress": "Copy your address",
+  "home.addName": "+ Add your name",
   "home.sendTo": "Send to",
   "home.sendTo.new": "New",
   "home.limit.title": "You can send up to {amount}",

@@ -372,6 +372,7 @@
   "home.addMoney": "Agregar dinero",
   "home.withdrawMoney": "Sacar dinero",
   "home.copyAddress": "Copiar tu dirección",
+  "home.addName": "+ Agrega tu nombre",
   "home.sendTo": "Enviar a",
   "home.sendTo.new": "Nuevo",
   "home.limit.title": "Puedes enviar hasta {amount}",
