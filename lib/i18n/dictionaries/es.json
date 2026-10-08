@@ -722,7 +722,6 @@
   "help.faq.q6": "¿Qué pasa si envío o retiro por billeteras por otra red?",
   "help.faq.a6": "Esta característica es para usuarios avanzados. Tus dólares digitales están en Base. Si ya usas billeteras sólo envía y retira a través de esta red o corres el riesgo de perderlos.",
   "help.contact.title": "¿Sigues atascado?",
-  "help.contact.body": "El soporte todavía no está conectado. Vivirá aquí.",
   "withdrawFlow.details.title": "¿Dónde te pagamos?",
   "withdrawFlow.details.subtitle": "Tus datos de {method} en {country}. Se guardan en tu dispositivo para siguientes retiros.",
   "withdrawFlow.details.savedNote": "Se guardan solo en este dispositivo. Revísalos bien: un dato incorrecto envía el dinero al lugar equivocado.",
