@@ -1,7 +1,7 @@
 "use client";
 
-import { SendToWallet } from "@/components/cashflow/send-to-wallet";
+import { SendUsdcOnBase } from "@/components/cashflow/send-usdc-on-base";
 
 export default function WithdrawUsdcOnBasePage() {
-  return <SendToWallet />;
+  return <SendUsdcOnBase />;
 }

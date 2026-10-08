@@ -7,7 +7,7 @@ import { Screen } from "@/components/ui/screen";
 import { Button } from "@/components/ui/button";
 import { RadioCard } from "@/components/ui/radio-card";
 import { NetworkLogo, NetworkLogoStack } from "@/components/ui/network-logos";
-import { SendToWallet } from "@/components/cashflow/send-to-wallet";
+import { SendUsdcOnBase } from "@/components/cashflow/send-usdc-on-base";
 import { typography } from "@/constants/typography";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
@@ -22,7 +22,7 @@ const STACK = STACK_ORDER.map((id) => NETWORKS.find((n) => n.id === id)!);
 
 export default function WithdrawToWalletScreen() {
   // Without Aurora there is only one way out, so skip straight to it.
-  if (!FLAGS.multichainDeposits) return <SendToWallet />;
+  if (!FLAGS.multichainDeposits) return <SendUsdcOnBase />;
   return <DestinationPicker />;
 }
 
