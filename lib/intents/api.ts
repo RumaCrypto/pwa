@@ -10,6 +10,7 @@ import {
   type WithdrawQuoteRequest,
 } from "./quote";
 import { parseStatusResponse, type StatusResult } from "./status";
+import { reviveActivity, type IntentActivityItem } from "./history";
 
 /** Keeps the HTTP status so the screen can tell our own refusals from Aurora's messages. */
 export class IntentsApiError extends Error {
@@ -31,6 +32,13 @@ async function errorFrom(response: Response): Promise<IntentsApiError> {
 /** The routes check the Privy session when INTENTS_AUTH_REQUIRED is on; sending it always keeps the client agnostic. */
 function authHeaders(accessToken: string | null): Record<string, string> {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+}
+
+/** Deposits and withdrawals Aurora recorded for the user's wallets, from any device. */
+export async function fetchIntentHistory(accessToken: string | null, fetchImpl: typeof fetch = fetch): Promise<IntentActivityItem[]> {
+  const response = await fetchImpl("/api/intents/history", { headers: authHeaders(accessToken) });
+  if (!response.ok) throw await errorFrom(response);
+  return reviveActivity(await response.json());
 }
 
 export async function fetchTokens(accessToken: string | null, fetchImpl: typeof fetch = fetch): Promise<IntentsToken[]> {

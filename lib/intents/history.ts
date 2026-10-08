@@ -1,5 +1,5 @@
 import { isExpired, type IntentDeposit } from "./deposits";
-import type { NetworkId } from "./networks";
+import { USDC_BASE_ASSET_ID, displaySymbol, isNetworkId, type IntentsToken, type NetworkId } from "./networks";
 import type { IntentWithdrawal } from "./withdrawals";
 
 /**
@@ -17,7 +17,8 @@ export interface IntentActivityItem {
   other: string;
   status: "delivered" | "pending" | "failed";
   occurredAt: Date;
-  href: string;
+  /** The tracking screen, which needs this device's record; null for operations made elsewhere. */
+  href: string | null;
 }
 
 /** Past its deadline by this much, an unresolved operation is stale rather than in flight. */
@@ -25,7 +26,7 @@ const STALE_AFTER_DEADLINE_MS = 6 * 60 * 60 * 1000;
 
 function depositItem(d: IntentDeposit, status: IntentActivityItem["status"]): IntentActivityItem {
   return {
-    id: `deposit:${d.depositAddress}`,
+    id: `deposit:${d.depositAddress.toLowerCase()}`,
     kind: "deposit",
     network: d.network,
     usdc: d.receivedFormatted ?? d.amountOutFormatted,
@@ -38,7 +39,7 @@ function depositItem(d: IntentDeposit, status: IntentActivityItem["status"]): In
 
 function withdrawalItem(w: IntentWithdrawal, status: IntentActivityItem["status"]): IntentActivityItem {
   return {
-    id: `withdrawal:${w.depositAddress}`,
+    id: `withdrawal:${w.depositAddress.toLowerCase()}`,
     kind: "withdrawal",
     network: w.network,
     usdc: w.amountInFormatted,
@@ -114,4 +115,109 @@ export function activeIntent(deposits: IntentDeposit[], withdrawals: IntentWithd
   }
 
   return candidates.sort((a, b) => newestFirst(a, b))[0] ?? null;
+}
+
+const REMOTE_STATUS: Record<string, IntentActivityItem["status"] | null> = {
+  // Nothing reached Aurora's address yet, so no money has moved.
+  PENDING_DEPOSIT: null,
+  KNOWN_DEPOSIT_TX: "pending",
+  PROCESSING: "pending",
+  INCOMPLETE_DEPOSIT: "pending",
+  SUCCESS: "delivered",
+  REFUNDED: "failed",
+  FAILED: "failed",
+};
+
+/**
+ * Aurora's transaction history for the user's wallets, as activity rows. It is
+ * what lets a deposit or withdrawal made on another device (or before the
+ * browser's storage was cleared) still show up.
+ */
+export function remoteActivity(body: unknown, tokens: readonly IntentsToken[], wallets: readonly string[]): IntentActivityItem[] {
+  const list = Array.isArray(body) ? body : (body as { data?: unknown } | null)?.data;
+  if (!Array.isArray(list)) return [];
+  const own = new Set(wallets.map((w) => w.toLowerCase()));
+  const tokenFor = (assetId: unknown) => tokens.find((t) => t.assetId === assetId);
+
+  return list.flatMap((entry): IntentActivityItem[] => {
+    if (entry === null || typeof entry !== "object") return [];
+    const tx = entry as Record<string, unknown>;
+    const status = typeof tx.status === "string" ? REMOTE_STATUS[tx.status] : undefined;
+    const occurredAt = new Date(typeof tx.createdAt === "string" ? tx.createdAt : NaN);
+    if (!status || !Number.isFinite(occurredAt.getTime())) return [];
+    if (typeof tx.depositAddress !== "string" || typeof tx.amountInFormatted !== "string" || typeof tx.amountOutFormatted !== "string") {
+      return [];
+    }
+
+    const origin = tokenFor(tx.originAsset);
+    const destination = tokenFor(tx.destinationAsset);
+    if (!origin || !destination) return [];
+    const address = tx.depositAddress.toLowerCase();
+
+    if (tx.originAsset === USDC_BASE_ASSET_ID && tx.destinationAsset !== USDC_BASE_ASSET_ID) {
+      if (!isNetworkId(destination.blockchain)) return [];
+      return [
+        {
+          id: `withdrawal:${address}`,
+          kind: "withdrawal",
+          network: destination.blockchain,
+          usdc: tx.amountInFormatted,
+          other: `${tx.amountOutFormatted} ${displaySymbol(destination.symbol)}`,
+          status,
+          occurredAt,
+          href: null,
+        },
+      ];
+    }
+    if (tx.destinationAsset === USDC_BASE_ASSET_ID && typeof tx.recipient === "string" && own.has(tx.recipient.toLowerCase())) {
+      if (!isNetworkId(origin.blockchain)) return [];
+      return [
+        {
+          id: `deposit:${address}`,
+          kind: "deposit",
+          network: origin.blockchain,
+          usdc: tx.amountOutFormatted,
+          other: `${tx.amountInFormatted} ${displaySymbol(origin.symbol)}`,
+          status,
+          occurredAt,
+          href: null,
+        },
+      ];
+    }
+    return [];
+  });
+}
+
+/**
+ * One row per operation. Aurora's view wins on status and amounts (it saw the
+ * settlement); this device's record supplies the link to its tracking screen.
+ */
+export function mergeIntentActivity(local: IntentActivityItem[], remote: IntentActivityItem[]): IntentActivityItem[] {
+  const byId = new Map(local.map((item) => [item.id, item]));
+  for (const item of remote) {
+    const mine = byId.get(item.id);
+    byId.set(item.id, mine ? { ...item, href: mine.href } : item);
+  }
+  return [...byId.values()].sort(newestFirst);
+}
+
+/** Rows from the history route's JSON, with dates restored; anything malformed is dropped. */
+export function reviveActivity(json: unknown): IntentActivityItem[] {
+  if (!Array.isArray(json)) return [];
+  return json.flatMap((row): IntentActivityItem[] => {
+    if (row === null || typeof row !== "object") return [];
+    const r = row as Record<string, unknown>;
+    const occurredAt = new Date(typeof r.occurredAt === "string" ? r.occurredAt : NaN);
+    const ok =
+      typeof r.id === "string" &&
+      (r.kind === "deposit" || r.kind === "withdrawal") &&
+      typeof r.network === "string" &&
+      isNetworkId(r.network) &&
+      typeof r.usdc === "string" &&
+      typeof r.other === "string" &&
+      (r.status === "delivered" || r.status === "pending" || r.status === "failed") &&
+      Number.isFinite(occurredAt.getTime());
+    // Links are never taken from the server: only this device's records may point somewhere.
+    return ok ? [{ ...(r as unknown as IntentActivityItem), occurredAt, href: null }] : [];
+  });
 }

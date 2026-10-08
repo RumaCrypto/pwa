@@ -38,12 +38,13 @@ import { NetworkLogo } from "@/components/ui/network-logos";
 import { findNetwork } from "@/lib/intents/networks";
 import { listDeposits } from "@/lib/intents/deposits";
 import { listWithdrawals } from "@/lib/intents/withdrawals";
-import { activeIntent, intentActivity, type IntentActivityItem } from "@/lib/intents/history";
+import { activeIntent, intentActivity, mergeIntentActivity, type IntentActivityItem } from "@/lib/intents/history";
+import { fetchIntentHistory } from "@/lib/intents/api";
 
 export default function HomePage() {
   const router = useRouter();
   const { t } = useI18n();
-  const { ready, authenticated, user } = usePrivy();
+  const { ready, authenticated, user, getAccessToken } = usePrivy();
   const address = user?.wallet?.address;
   const { displayName: ownName, username, email, setUsername } = useUsername();
   const [editingName, setEditingName] = useState(false);
@@ -55,15 +56,30 @@ export default function HomePage() {
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect --
        Deposits and withdrawals live in localStorage, which only exists after mount. */
+    let local: IntentActivityItem[] = [];
     try {
       const deposits = listDeposits(localStorage);
       const withdrawals = listWithdrawals(localStorage);
-      setIntents({ items: intentActivity(deposits, withdrawals), active: activeIntent(deposits, withdrawals, new Date()) });
+      local = intentActivity(deposits, withdrawals);
+      setIntents({ items: local, active: activeIntent(deposits, withdrawals, new Date()) });
     } catch {
       // Storage blocked (private mode): the on-chain activity still shows.
     }
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, []);
+
+    // Aurora's record covers operations made on other devices; this device's rows show meanwhile.
+    if (!FLAGS.multichainDeposits || !authenticated) return;
+    let cancelled = false;
+    getAccessToken()
+      .then((token) => fetchIntentHistory(token))
+      .then((remote) => {
+        if (!cancelled) setIntents((current) => ({ ...current, items: mergeIntentActivity(local, remote) }));
+      })
+      .catch((err) => console.error("Could not load Aurora history", err instanceof Error ? err.message : "unknown"));
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated, getAccessToken]);
 
   const { balance, loading: balanceLoading, error: balanceError } = useUsdcBalance(address);
   const { format, formatParts } = useMoney();
@@ -224,7 +240,9 @@ export default function HomePage() {
       </div>
 
       {/* With the feature off, the deposit and withdrawal screens 404, so nothing may point at them. */}
-      {FLAGS.multichainDeposits && intents.active && <InProgressCard item={intents.active} onOpen={() => router.push(intents.active!.href)} />}
+      {FLAGS.multichainDeposits && intents.active?.href && (
+        <InProgressCard item={intents.active} onOpen={() => router.push(intents.active!.href!)} />
+      )}
 
       <SectionTitle className="mt-8">{t("home.sendTo")}</SectionTitle>
       <div className="-mx-6 flex gap-4 overflow-x-auto px-6 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -271,7 +289,7 @@ export default function HomePage() {
               <IntentRow
                 key={row.item.id}
                 item={row.item}
-                onOpen={FLAGS.multichainDeposits ? () => router.push(row.item.href) : undefined}
+                onOpen={FLAGS.multichainDeposits && row.item.href ? () => router.push(row.item.href!) : undefined}
               />
             )
           )}

@@ -5,14 +5,14 @@
  */
 export function ownsWallet(linkedAccounts: readonly unknown[], address: string): boolean {
   const target = address.toLowerCase();
-  return linkedAccounts.some((account) => {
-    if (typeof account !== "object" || account === null) return false;
+  return ethereumWallets(linkedAccounts).some((wallet) => wallet.toLowerCase() === target);
+}
+
+/** Every Ethereum wallet linked to a Privy user, in Privy's order. */
+export function ethereumWallets(linkedAccounts: readonly unknown[]): string[] {
+  return linkedAccounts.flatMap((account) => {
+    if (typeof account !== "object" || account === null) return [];
     const a = account as { type?: unknown; chain_type?: unknown; address?: unknown };
-    return (
-      a.type === "wallet" &&
-      a.chain_type === "ethereum" &&
-      typeof a.address === "string" &&
-      a.address.toLowerCase() === target
-    );
+    return a.type === "wallet" && a.chain_type === "ethereum" && typeof a.address === "string" ? [a.address] : [];
   });
 }

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   IntentsApiError,
   fetchDepositStatus,
+  fetchIntentHistory,
   fetchTokens,
   requestDepositQuote,
   requestWithdrawEstimate,
@@ -107,5 +108,19 @@ describe("fetchTokens", () => {
 
   it("fails loudly on a body with no token list", async () => {
     await expect(fetchTokens("tok", json(200, { asset_stats: [] }))).rejects.toThrow(/token list/);
+  });
+});
+
+describe("fetchIntentHistory", () => {
+  it("asks our history route with the session and revives the rows", async () => {
+    const row = { id: "withdrawal:0xabc", kind: "withdrawal", network: "tron", usdc: "3.6", other: "1.86 USDT", status: "delivered", occurredAt: "2026-10-08T00:48:49.623Z", href: "/evil" };
+    const fetchImpl = json(200, [row]);
+    const rows = await fetchIntentHistory("tok", fetchImpl);
+    expect(fetchImpl).toHaveBeenCalledWith("/api/intents/history", { headers: { Authorization: "Bearer tok" } });
+    expect(rows).toEqual([{ ...row, occurredAt: new Date(row.occurredAt), href: null }]);
+  });
+
+  it("throws on an error status so the screen keeps what it already has", async () => {
+    await expect(fetchIntentHistory("tok", json(502, { error: "Could not reach Aurora" }))).rejects.toThrow();
   });
 });
