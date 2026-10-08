@@ -69,6 +69,8 @@ function WithdrawReview() {
   const [shown, setShown] = useState<WithdrawEstimate | null>(null);
   const [changed, setChanged] = useState(false);
   const [busy, setBusy] = useState(false);
+  // What "busy" is waiting on, so a slow step reads as progress rather than a hang.
+  const [step, setStep] = useState<"checking" | "signing" | "confirming">("checking");
   const [error, setError] = useState<unknown>(null);
   const [addressCopied, setAddressCopied] = useState(false);
   // Terminal: the transfer may have left but no record exists, so this screen must never offer a retry.
@@ -106,6 +108,7 @@ function WithdrawReview() {
     if (locked.current || !owner || !isAddress(owner)) return;
     locked.current = true;
     setBusy(true);
+    setStep("checking");
     setError(null);
     setChanged(false);
     setOwnRecipient(false);
@@ -167,6 +170,7 @@ function WithdrawReview() {
             }),
           waitForReceipt: ({ hash }) => baseClient.waitForTransactionReceipt({ hash }),
           submitTx: (hash, depositAddress) => submitDepositTx(hash, depositAddress, token),
+          onProgress: setStep,
         }
       );
       // Money has left: from here nothing may be reported as a failure to retry.
@@ -238,7 +242,7 @@ function WithdrawReview() {
             </>
           ) : (
             <Button variant="black" onClick={handleConfirm} disabled={busy || !owner}>
-              {busy ? t("withdrawFlow.review.sending") : t("withdrawFlow.review.confirm")}
+              {busy ? t(`withdrawFlow.review.step.${step}`) : t("withdrawFlow.review.confirm")}
             </Button>
           )}
           {!unconfirmed && (errorText || changed) && (

@@ -18,6 +18,8 @@ export interface WithdrawDeps {
   transfer: (to: Hex, amount: bigint) => Promise<Hex>;
   waitForReceipt: (params: { hash: Hex }) => Promise<{ status: "success" | "reverted" }>;
   submitTx: (hash: string, depositAddress: string) => Promise<void>;
+  /** "signing" before the wallet is asked to sign, "confirming" once the transfer is broadcast. */
+  onProgress?: (step: "signing" | "confirming") => void;
 }
 
 /** Walks an error and its causes; viem wraps the useful error several levels deep. */
@@ -85,6 +87,7 @@ export async function executeWithdrawal(
 
   let hash: Hex;
   try {
+    deps.onProgress?.("signing");
     hash = await deps.transfer(address as Hex, confirmedAmount);
   } catch (err) {
     if (isUserRejection(err) || failedBeforeBroadcast(err)) {
@@ -97,6 +100,7 @@ export async function executeWithdrawal(
   // From here the money may have left: anything but a confirmed revert is "unconfirmed".
   let status: "success" | "reverted";
   try {
+    deps.onProgress?.("confirming");
     updateWithdrawal(deps.storage, address, { transferTxHash: hash });
     ({ status } = await deps.waitForReceipt({ hash }));
   } catch (err) {
@@ -121,7 +125,8 @@ export async function executeWithdrawal(
   if (!withdrawal) throw new WithdrawError("unconfirmed");
 
   // Neither of these may fail the withdrawal: the USDC is already on its way.
-  await deps.submitTx(hash, address).catch((err) => console.error("Could not tell Aurora about the deposit", err));
+  // Not awaited: it only speeds Aurora up, and a slow answer kept the user on "Sending…" after the money had left.
+  void deps.submitTx(hash, address).catch((err) => console.error("Could not tell Aurora about the deposit", err));
   if (feeAmount > 0n && fee.treasury) {
     await deps.transfer(fee.treasury, feeAmount).catch((err) => console.error("Ruma withdrawal fee was not charged", err));
   }

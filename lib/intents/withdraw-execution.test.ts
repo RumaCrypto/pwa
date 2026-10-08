@@ -46,6 +46,19 @@ function setup(overrides: Partial<WithdrawDeps> = {}) {
 const input = (overrides = {}) => ({ request: REQUEST, quote: QUOTE, asset: ASSET, confirmedAmount: 50_000_000n, fee: NO_FEE, ...overrides });
 
 describe("executeWithdrawal", () => {
+  it("doesn't wait on telling Aurora: the transfer is final and the track screen polls anyway", async () => {
+    const deps = setup({ submitTx: vi.fn(() => new Promise<void>(() => {})) });
+    await expect(executeWithdrawal(input(), deps)).resolves.toMatchObject({ phase: "awaiting_deposit" });
+    expect(deps.submitTx).toHaveBeenCalledWith(HASH, DEPOSIT);
+  });
+
+  it("reports each step so the screen can say what it is waiting on", async () => {
+    const steps: string[] = [];
+    const deps = setup({ onProgress: (step) => steps.push(step) });
+    await executeWithdrawal(input(), deps);
+    expect(steps).toEqual(["signing", "confirming"]);
+  });
+
   it("signs nothing and records nothing when the wallet has no ETH for gas", async () => {
     const deps = setup({ hasGasFor: vi.fn(async () => false) });
     await expect(executeWithdrawal(input(), deps)).rejects.toMatchObject({ code: "gas" });
