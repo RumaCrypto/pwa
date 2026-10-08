@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { executeWithdrawal, failedBeforeBroadcast, isUserRejection, type WithdrawDeps } from "./withdraw-execution";
+import { coversGas, executeWithdrawal, failedBeforeBroadcast, isUserRejection, type WithdrawDeps } from "./withdraw-execution";
 import { getWithdrawal } from "./withdrawals";
 import { WithdrawError } from "./withdraw-errors";
 import type { WithdrawQuote, WithdrawQuoteRequest } from "./quote";
@@ -35,6 +35,7 @@ function setup(overrides: Partial<WithdrawDeps> = {}) {
     storage: memoryStorage(),
     now: () => NOW,
     readBalance: vi.fn(async () => 100_000_000n),
+    hasGasFor: vi.fn(async () => true),
     transfer: vi.fn(async () => HASH),
     waitForReceipt: vi.fn(async () => ({ status: "success" as const })),
     submitTx: vi.fn(async () => {}),
@@ -45,6 +46,26 @@ function setup(overrides: Partial<WithdrawDeps> = {}) {
 const input = (overrides = {}) => ({ request: REQUEST, quote: QUOTE, asset: ASSET, confirmedAmount: 50_000_000n, fee: NO_FEE, ...overrides });
 
 describe("executeWithdrawal", () => {
+  it("signs nothing and records nothing when the wallet has no ETH for gas", async () => {
+    const deps = setup({ hasGasFor: vi.fn(async () => false) });
+    await expect(executeWithdrawal(input(), deps)).rejects.toMatchObject({ code: "gas" });
+    expect(deps.hasGasFor).toHaveBeenCalledWith(DEPOSIT, 50_000_000n);
+    expect(deps.transfer).not.toHaveBeenCalled();
+    expect(getWithdrawal(deps.storage, DEPOSIT)).toBeUndefined();
+  });
+
+  it("reports missing gas, not a generic failure, when the wallet rejects for insufficient funds", async () => {
+    const insufficient = Object.assign(new Error("x"), { name: "ContractFunctionExecutionError", cause: { name: "InsufficientFundsError" } });
+    const deps = setup({ transfer: vi.fn(async () => { throw insufficient; }) });
+    await expect(executeWithdrawal(input(), deps)).rejects.toMatchObject({ code: "gas" });
+    expect(getWithdrawal(deps.storage, DEPOSIT)?.phase).toBe("transfer_failed");
+  });
+
+  it("keeps the hash of a transfer that reverted on-chain, so the user can look it up", async () => {
+    const deps = setup({ waitForReceipt: vi.fn(async () => ({ status: "reverted" as const })) });
+    await expect(executeWithdrawal(input(), deps)).rejects.toMatchObject({ code: "reverted", txHash: HASH });
+  });
+
   it("sends exactly the confirmed USDC to the deposit address, then tells Aurora", async () => {
     const deps = setup();
     const withdrawal = await executeWithdrawal(input(), deps);
@@ -89,9 +110,9 @@ describe("executeWithdrawal", () => {
     expect(getWithdrawal(deps.storage, DEPOSIT)?.phase).toBe("transfer_failed");
   });
 
-  it("marks it not sent when the transfer fails before broadcast (e.g. no ETH for gas)", async () => {
-    const gas = Object.assign(new Error("insufficient funds"), { name: "ContractFunctionExecutionError", cause: { name: "InsufficientFundsError" } });
-    const deps = setup({ transfer: vi.fn(async () => Promise.reject(gas)) });
+  it("marks it not sent when the transfer fails before broadcast (e.g. gas estimation fails)", async () => {
+    const failed = Object.assign(new Error("execution reverted"), { name: "ContractFunctionExecutionError", cause: { name: "EstimateGasExecutionError" } });
+    const deps = setup({ transfer: vi.fn(async () => Promise.reject(failed)) });
     await expect(executeWithdrawal(input(), deps)).rejects.toMatchObject({ code: "reverted" });
     expect(getWithdrawal(deps.storage, DEPOSIT)?.phase).toBe("transfer_failed");
   });
@@ -186,5 +207,13 @@ describe("error classification", () => {
 
   it("is a WithdrawError", () => {
     expect(new WithdrawError("balance")).toBeInstanceOf(Error);
+  });
+});
+
+describe("coversGas", () => {
+  it("needs the estimated cost plus a 20% margin, since the base fee can rise before the tx lands", () => {
+    expect(coversGas(1_200n, 100n, 10n)).toBe(true);
+    expect(coversGas(1_199n, 100n, 10n)).toBe(false);
+    expect(coversGas(0n, 50_000n, 1n)).toBe(false);
   });
 });

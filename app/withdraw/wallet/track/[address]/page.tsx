@@ -16,7 +16,7 @@ import { FLAGS } from "@/lib/flags";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { formatDayAndTime } from "@/lib/datetime";
 import { findNetwork } from "@/lib/intents/networks";
-import { explorerTxUrl } from "@/lib/intents/explorers";
+import { baseTxUrl, explorerTxUrl } from "@/lib/intents/explorers";
 import { getWithdrawal, updateWithdrawal, type IntentWithdrawal } from "@/lib/intents/withdrawals";
 import { useWithdrawalStatus } from "@/lib/intents/use-withdrawal-status";
 
@@ -122,6 +122,11 @@ function WithdrawalProgress({ withdrawal, onHome, onAgain }: { withdrawal: Inten
             <AddressChunks address={withdrawal.depositAddress} />
           </Card>
         )}
+        {withdrawal.transferTxHash && (
+          <Card className="mt-4 px-5 py-3">
+            <BaseTransferRow hash={withdrawal.transferTxHash} />
+          </Card>
+        )}
       </Screen>
     );
   }
@@ -153,6 +158,12 @@ function WithdrawalProgress({ withdrawal, onHome, onAgain }: { withdrawal: Inten
         <Step state={converting ? "active" : unconfirmed ? "todo" : "done"} label={t("withdrawFlow.track.converting", params)} />
         <Step state="todo" label={t("withdrawFlow.track.delivered")} />
       </Card>
+
+      {withdrawal.transferTxHash && (
+        <Card className="mt-4 px-5 py-3">
+          <BaseTransferRow hash={withdrawal.transferTxHash} />
+        </Card>
+      )}
     </Screen>
   );
 }
@@ -181,6 +192,7 @@ function WithdrawalDone({ withdrawal, onDone }: { withdrawal: IntentWithdrawal; 
         <DetailRow label={t("withdrawFlow.review.send")} value={`${withdrawal.amountInFormatted} USDC · Base`} />
         <DetailRow label={t("intents.done.received")} value={`${received} ${withdrawal.assetSymbol}`} emphasis />
         <DetailRow label={t("intents.done.date")} value={formatDayAndTime(withdrawal.completedAt ?? withdrawal.createdAt, language)} />
+        <BaseTransferRow hash={withdrawal.transferTxHash} />
         {explorer && (
           <DetailRow
             label={t("withdrawFlow.done.transaction")}
@@ -201,5 +213,23 @@ function WithdrawalDone({ withdrawal, onDone }: { withdrawal: IntentWithdrawal; 
         <AddressChunks address={withdrawal.recipient} />
       </Card>
     </Screen>
+  );
+}
+
+/** Links the USDC transfer on Base, the part of a withdrawal the user signed. */
+function BaseTransferRow({ hash }: { hash?: string }) {
+  const { t } = useI18n();
+  const url = hash ? baseTxUrl(hash) : null;
+  if (!url) return null;
+  return (
+    <DetailRow
+      label={t("withdrawFlow.track.transfer")}
+      value={
+        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary">
+          {t("withdrawFlow.viewOnBasescan")}
+          <ExternalLink size={14} />
+        </a>
+      }
+    />
   );
 }

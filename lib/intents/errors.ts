@@ -45,7 +45,8 @@ export type WithdrawErrorKey =
   | "withdrawFlow.errors.expired"
   | "withdrawFlow.errors.balance"
   | "withdrawFlow.errors.rejected"
-  | "withdrawFlow.errors.reverted";
+  | "withdrawFlow.errors.reverted"
+  | "withdrawFlow.errors.gas";
 
 const WITHDRAW_ERROR_KEYS: Record<Exclude<WithdrawErrorCode, "unconfirmed">, WithdrawErrorKey> = {
   mismatch: "withdrawFlow.errors.mismatch",
@@ -53,6 +54,7 @@ const WITHDRAW_ERROR_KEYS: Record<Exclude<WithdrawErrorCode, "unconfirmed">, Wit
   balance: "withdrawFlow.errors.balance",
   rejected: "withdrawFlow.errors.rejected",
   reverted: "withdrawFlow.errors.reverted",
+  gas: "withdrawFlow.errors.gas",
 };
 
 /** Copy for a withdrawal that stopped before money moved. "unconfirmed" has none: the screen sends the user to tracking instead. */

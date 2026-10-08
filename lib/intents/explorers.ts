@@ -27,3 +27,8 @@ export function explorerTxUrl(network: NetworkId, hash: string): string | null {
       return NEAR_HASH.test(hash) ? `https://nearblocks.io/txns/${hash}` : null;
   }
 }
+
+/** The USDC transfer that starts every withdrawal happens on Base. */
+export function baseTxUrl(hash: string): string | null {
+  return EVM_HASH.test(hash) ? `https://basescan.org/tx/${hash}` : null;
+}

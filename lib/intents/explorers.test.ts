@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { explorerTxUrl } from "./explorers";
+import { baseTxUrl, explorerTxUrl } from "./explorers";
 
 const EVM_HASH = `0x${"ab".repeat(32)}`;
 const HEX_HASH = "ab".repeat(32);
@@ -21,5 +21,17 @@ describe("explorerTxUrl", () => {
     expect(explorerTxUrl("eth", "javascript:alert(1)")).toBeNull();
     expect(explorerTxUrl("btc", `${HEX_HASH}/../../evil`)).toBeNull();
     expect(explorerTxUrl("near", "https://evil.example")).toBeNull();
+  });
+});
+
+describe("baseTxUrl", () => {
+  it("links a Base transaction on BaseScan", () => {
+    const hash = `0x${"ab".repeat(32)}`;
+    expect(baseTxUrl(hash)).toBe(`https://basescan.org/tx/${hash}`);
+  });
+
+  it("refuses anything that isn't a transaction hash", () => {
+    expect(baseTxUrl("javascript:alert(1)")).toBeNull();
+    expect(baseTxUrl("0x1234")).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { notFound, useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { formatUnits, isAddress, type Address } from "viem";
+import { Copy, ExternalLink } from "lucide-react";
 
 import { Screen } from "@/components/ui/screen";
 import { Card } from "@/components/ui/card";
@@ -28,7 +29,8 @@ import { errorKey, withdrawErrorKey } from "@/lib/intents/errors";
 import { WithdrawError } from "@/lib/intents/withdraw-errors";
 import { clearDraft, readDraft, type WithdrawDraft } from "@/lib/intents/withdraw-draft";
 import { findActiveWithdrawal, isOwnIntentAddress, type IntentWithdrawal } from "@/lib/intents/withdrawals";
-import { executeWithdrawal } from "@/lib/intents/withdraw-execution";
+import { coversGas, executeWithdrawal } from "@/lib/intents/withdraw-execution";
+import { baseTxUrl } from "@/lib/intents/explorers";
 
 export default function WithdrawReviewPage() {
   if (!FLAGS.multichainDeposits) notFound();
@@ -47,6 +49,7 @@ function WithdrawReview() {
   const [changed, setChanged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [addressCopied, setAddressCopied] = useState(false);
   // Terminal: the transfer may have left but no record exists, so this screen must never offer a retry.
   const [unconfirmed, setUnconfirmed] = useState(false);
   // The recipient is one of the user's own one-time deposit addresses (S2); nothing was requested.
@@ -127,6 +130,25 @@ function WithdrawReview() {
           now: () => new Date(),
           readBalance: () =>
             baseClient.readContract({ address: USDC_ADDRESS_BASE, abi: erc20BalanceOfAbi, functionName: "balanceOf", args: [address] }),
+          hasGasFor: async (to: Address, value: bigint) => {
+            try {
+              const [gas, fees, eth] = await Promise.all([
+                baseClient.estimateContractGas({
+                  address: USDC_ADDRESS_BASE,
+                  abi: erc20TransferAbi,
+                  functionName: "transfer",
+                  args: [to, value],
+                  account: address,
+                }),
+                baseClient.estimateFeesPerGas(),
+                baseClient.getBalance({ address }),
+              ]);
+              return coversGas(eth, gas, fees.maxFeePerGas);
+            } catch {
+              // The check is a courtesy: if the RPC can't answer, signing still reports missing gas.
+              return true;
+            }
+          },
           transfer: (to: Address, value: bigint) =>
             walletClient.writeContract({
               address: USDC_ADDRESS_BASE,
@@ -179,6 +201,15 @@ function WithdrawReview() {
     ? t("withdrawFlow.errors.recipient")
     : error == null ? null : key ? t(key) : error instanceof Error ? error.message : String(error);
   const minimum = formatUnits(BigInt(shown.minAmountOut), draft.asset.decimals);
+  const noGas = error instanceof WithdrawError && error.code === "gas";
+  const failedTx = error instanceof WithdrawError && error.txHash ? baseTxUrl(error.txHash) : null;
+
+  const copyOwnAddress = async () => {
+    if (!owner) return;
+    await navigator.clipboard.writeText(owner);
+    setAddressCopied(true);
+    setTimeout(() => setAddressCopied(false), 2000);
+  };
 
   return (
     <Screen
@@ -207,6 +238,28 @@ function WithdrawReview() {
             <p style={typography.body5} className="mt-3 text-center text-danger">
               {errorText ?? t("withdrawFlow.review.changed")}
             </p>
+          )}
+          {!unconfirmed && noGas && owner && (
+            <button
+              onClick={copyOwnAddress}
+              style={typography.body5}
+              className="mx-auto mt-2 flex items-center gap-1.5 text-primary active:opacity-70"
+            >
+              <Copy size={14} aria-hidden />
+              {addressCopied ? t("cashflow.receive.copied") : t("withdrawFlow.errors.gasCopy")}
+            </button>
+          )}
+          {!unconfirmed && failedTx && (
+            <a
+              href={failedTx}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={typography.body5}
+              className="mx-auto mt-2 flex w-fit items-center gap-1.5 text-primary"
+            >
+              {t("withdrawFlow.viewOnBasescan")}
+              <ExternalLink size={14} aria-hidden />
+            </a>
           )}
         </>
       }

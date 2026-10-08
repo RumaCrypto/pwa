@@ -50,6 +50,7 @@ describe("withdrawal errors", () => {
     expect(withdrawErrorKey(new WithdrawError("balance"))).toBe("withdrawFlow.errors.balance");
     expect(withdrawErrorKey(new WithdrawError("rejected"))).toBe("withdrawFlow.errors.rejected");
     expect(withdrawErrorKey(new WithdrawError("reverted"))).toBe("withdrawFlow.errors.reverted");
+    expect(withdrawErrorKey(new WithdrawError("gas"))).toBe("withdrawFlow.errors.gas");
     expect(withdrawErrorKey(new WithdrawError("unconfirmed"))).toBeNull();
     expect(withdrawErrorKey(new Error("x"))).toBeNull();
   });

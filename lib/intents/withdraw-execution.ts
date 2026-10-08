@@ -12,6 +12,8 @@ export interface WithdrawDeps {
   now: () => Date;
   /** USDC on Base, read on-chain right before signing. */
   readBalance: () => Promise<bigint>;
+  /** Whether the wallet holds enough ETH on Base to pay gas for this transfer. */
+  hasGasFor: (to: Hex, amount: bigint) => Promise<boolean>;
   /** USDC `transfer` on Base, signed by the user's wallet; resolves to the tx hash. */
   transfer: (to: Hex, amount: bigint) => Promise<Hex>;
   waitForReceipt: (params: { hash: Hex }) => Promise<{ status: "success" | "reverted" }>;
@@ -37,6 +39,16 @@ export function isUserRejection(err: unknown): boolean {
 // failure in it, including timeouts and HTTP errors after the tx was broadcast.
 // The causes below are found inside the wrapper by the chain walk.
 const PRE_BROADCAST = new Set(["InsufficientFundsError", "EstimateGasExecutionError", "ChainMismatchError"]);
+
+/** The estimated gas cost with a 20% margin, since Base's fee can rise between the check and the signature. */
+export function coversGas(ethBalance: bigint, gas: bigint, maxFeePerGas: bigint): boolean {
+  return ethBalance * 10n >= gas * maxFeePerGas * 12n;
+}
+
+/** No ETH for gas: worth its own message, since the fix is on the user's side. */
+export function isMissingGas(err: unknown): boolean {
+  return someInChain(err, (e) => e.name === "InsufficientFundsError");
+}
 
 /** Errors viem raises while preparing the transaction, before anything reaches the chain. */
 export function failedBeforeBroadcast(err: unknown): boolean {
@@ -66,6 +78,9 @@ export async function executeWithdrawal(
   if ((await deps.readBalance()) < confirmedAmount + feeAmount) throw new WithdrawError("balance");
 
   const address = quote.depositAddress;
+  // Checked before anything is saved: a wallet with no ETH can't send, so there is nothing to track.
+  if (!(await deps.hasGasFor(address as Hex, confirmedAmount))) throw new WithdrawError("gas");
+
   saveWithdrawal(deps.storage, withdrawalFromQuote(quote, asset, request.recipient, now));
 
   let hash: Hex;
@@ -74,7 +89,7 @@ export async function executeWithdrawal(
   } catch (err) {
     if (isUserRejection(err) || failedBeforeBroadcast(err)) {
       updateWithdrawal(deps.storage, address, { phase: "transfer_failed" });
-      throw new WithdrawError(isUserRejection(err) ? "rejected" : "reverted");
+      throw new WithdrawError(isUserRejection(err) ? "rejected" : isMissingGas(err) ? "gas" : "reverted");
     }
     console.error("Withdrawal transfer failed in an unknown state", err);
     throw new WithdrawError("unconfirmed");
@@ -95,7 +110,7 @@ export async function executeWithdrawal(
       console.error("Could not record the reverted withdrawal transfer", err);
       throw new WithdrawError("unconfirmed");
     }
-    throw new WithdrawError("reverted");
+    throw new WithdrawError("reverted", hash);
   }
   let withdrawal: IntentWithdrawal | undefined;
   try {
