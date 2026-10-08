@@ -4,6 +4,7 @@ import {
   depositFromQuote,
   getDeposit,
   isExpired,
+  listDeposits,
   nextPollAction,
   saveDeposit,
   updateDeposit,
@@ -139,5 +140,18 @@ describe("nextPollAction", () => {
   it("expires awaiting and incomplete deposits after deadline plus grace", () => {
     expect(nextPollAction("awaiting_deposit", deadline, late)).toBe("expired");
     expect(nextPollAction("incomplete", deadline, late)).toBe("expired");
+  });
+});
+
+describe("listDeposits", () => {
+  it("returns every stored deposit and skips entries that aren't records", () => {
+    const storage = memoryStorage();
+    saveDeposit(storage, depositFromQuote(QUOTE, "tron", "USDT", NOW));
+    const raw = JSON.parse(storage.getItem("ruma-intent-deposits")!);
+    raw.junk = null;
+    raw.bad = { createdAt: "not a date", deadline: "x" };
+    storage.setItem("ruma-intent-deposits", JSON.stringify(raw));
+
+    expect(listDeposits(storage).map((d) => d.depositAddress)).toEqual(["TXyz"]);
   });
 });

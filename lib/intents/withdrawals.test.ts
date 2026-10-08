@@ -4,6 +4,7 @@ import {
   getWithdrawal,
   isOwnIntentAddress,
   isWithdrawalSettled,
+  listWithdrawals,
   saveWithdrawal,
   updateWithdrawal,
   withdrawalFromQuote,
@@ -155,5 +156,18 @@ describe("isOwnIntentAddress", () => {
     storage.setItem("ruma-intent-deposits", "null");
     storage.setItem("ruma-intent-withdrawals", "[1]");
     expect(isOwnIntentAddress(storage, ADDR)).toBe(false);
+  });
+});
+
+describe("listWithdrawals", () => {
+  it("returns every stored withdrawal and skips entries that aren't records", () => {
+    const storage = memoryStorage();
+    saveWithdrawal(storage, withdrawalFromQuote(QUOTE, ASSET, "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", NOW));
+    const raw = JSON.parse(storage.getItem("ruma-intent-withdrawals")!);
+    raw.junk = null;
+    raw.bad = { createdAt: "not a date", deadline: "x" };
+    storage.setItem("ruma-intent-withdrawals", JSON.stringify(raw));
+
+    expect(listWithdrawals(storage).map((w) => w.depositAddress)).toEqual([QUOTE.depositAddress]);
   });
 });
