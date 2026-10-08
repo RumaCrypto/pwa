@@ -54,7 +54,7 @@ export default function AddMoneyBankReviewScreen() {
         (cfg) => {
           const usdcAmount = quote.usdc.amount * TO_SDK_SCALE;
           if (usdcAmount > 0n && usdcAmount <= cfg.smallOrderThreshold) {
-            const fee = Number(cfg.smallOrderFixedFee) / 10 ** USDC_DECIMALS;
+            const fee = Number(cfg.smallOrderFixedFeeBuy) / 10 ** USDC_DECIMALS;
             setFeeLabel(`$${fee.toFixed(2)} USDC`);
           } else {
             setFeeLabel(t("depositFlow.review.standardFee"));
