@@ -790,6 +790,7 @@
   "withdrawFlow.track.transfer": "Your transfer on Base",
   "withdrawFlow.errors.recipient": "We can't send to this address. Check it and try again.",
   "withdrawFlow.track.title": "Withdrawal {id}",
+  "withdrawFlow.track.walletTitle": "Your withdrawal",
   "withdrawFlow.track.sent": "Sent from your balance",
   "withdrawFlow.track.converting": "Converting to {asset} on {network}",
   "withdrawFlow.track.delivered": "Money received",

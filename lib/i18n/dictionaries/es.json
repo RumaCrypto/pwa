@@ -790,6 +790,7 @@
   "withdrawFlow.track.transfer": "Tu envío en Base",
   "withdrawFlow.errors.recipient": "No podemos enviar a esta dirección. Revísala e inténtalo de nuevo.",
   "withdrawFlow.track.title": "Retiro {id}",
+  "withdrawFlow.track.walletTitle": "Tu retiro",
   "withdrawFlow.track.sent": "Enviado desde tu saldo",
   "withdrawFlow.track.converting": "Convirtiendo a {asset} en {network}",
   "withdrawFlow.track.delivered": "Dinero recibido",

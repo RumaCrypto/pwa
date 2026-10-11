@@ -61,7 +61,7 @@ function WithdrawalTrack() {
   if (withdrawal === undefined) return null;
   if (withdrawal === null) {
     return (
-      <Screen title={t("withdrawFlow.track.title")} backLabel={t("common.back")}>
+      <Screen title={t("withdrawFlow.track.walletTitle")} backLabel={t("common.back")}>
         <p style={typography.body3} className="text-text-secondary">
           {t("withdrawFlow.track.notFound")}
         </p>
@@ -101,7 +101,7 @@ function WithdrawalProgress({ withdrawal, onHome, onAgain }: { withdrawal: Inten
     }[phase];
     return (
       <Screen
-        title={t("withdrawFlow.track.title")}
+        title={t("withdrawFlow.track.walletTitle")}
         backLabel={t("common.back")}
         footer={
           <>
@@ -136,7 +136,7 @@ function WithdrawalProgress({ withdrawal, onHome, onAgain }: { withdrawal: Inten
 
   return (
     <Screen
-      title={t("withdrawFlow.track.title")}
+      title={t("withdrawFlow.track.walletTitle")}
       backLabel={t("common.back")}
       footer={
         <Button variant="secondary" onClick={onHome}>

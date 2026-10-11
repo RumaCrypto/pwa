@@ -790,6 +790,7 @@
   "withdrawFlow.track.transfer": "Seu envio na Base",
   "withdrawFlow.errors.recipient": "Não podemos enviar para este endereço. Confira e tente de novo.",
   "withdrawFlow.track.title": "Saque {id}",
+  "withdrawFlow.track.walletTitle": "Seu saque",
   "withdrawFlow.track.sent": "Enviado do seu saldo",
   "withdrawFlow.track.converting": "Convertendo para {asset} na {network}",
   "withdrawFlow.track.delivered": "Dinheiro recebido",
