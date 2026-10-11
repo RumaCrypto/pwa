@@ -27,15 +27,7 @@ const TOKENS: IntentsToken[] = [
 
 describe("network catalogue", () => {
   it("offers the networks from the spec, without Base, which has its own option", () => {
-    expect(NETWORKS.map((n) => n.id)).toEqual(["eth", "arb", "tron", "btc", "near"]);
-  });
-
-  it("doesn't offer Optimism, which Aurora won't quote, so a link to it 404s", () => {
-    expect(isNetworkId("op")).toBe(false);
-  });
-
-  it("still names Optimism, so a stored record from it renders instead of crashing", () => {
-    expect(findNetwork("op")).toEqual({ id: "op", name: "Optimism", logo: "/networks/op.svg" });
+    expect(NETWORKS.map((n) => n.id)).toEqual(["eth", "arb", "op", "tron", "btc", "near"]);
   });
 
   it("recognises only catalogued network ids", () => {

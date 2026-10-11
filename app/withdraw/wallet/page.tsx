@@ -17,7 +17,7 @@ import { BASE_NETWORK, NETWORKS } from "@/lib/intents/networks";
 type Destination = "base" | "networks";
 
 /** Display order the designs ask for on the "other networks" option. */
-const STACK_ORDER = ["tron", "btc", "eth", "arb", "near"] as const;
+const STACK_ORDER = ["tron", "btc", "eth", "op", "arb", "near"] as const;
 const STACK = STACK_ORDER.map((id) => NETWORKS.find((n) => n.id === id)!);
 
 export default function WithdrawToWalletScreen() {
