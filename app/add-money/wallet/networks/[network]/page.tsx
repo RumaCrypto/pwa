@@ -14,10 +14,11 @@ import { typography } from "@/constants/typography";
 import { FLAGS } from "@/lib/flags";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { isValidNetworkAddress } from "@/lib/intents/addresses";
-import { assetsForNetwork, findNetwork, isNetworkId, type DepositAsset, type Network } from "@/lib/intents/networks";
+import { assetsForNetwork, findNetwork, isNetworkId, type Network } from "@/lib/intents/networks";
 import { buildQuoteRequest, parseAmount, refundModeFrom, type Refund } from "@/lib/intents/quote";
 import { depositFromQuote, saveDeposit } from "@/lib/intents/deposits";
-import { fetchTokens, requestDepositQuote } from "@/lib/intents/api";
+import { requestDepositQuote } from "@/lib/intents/api";
+import { useIntentTokens } from "@/lib/intents/use-intent-tokens";
 import { errorKey } from "@/lib/intents/errors";
 
 const REFUND_MODE = refundModeFrom(process.env.NEXT_PUBLIC_INTENTS_REFUND_MODE);
@@ -37,29 +38,24 @@ function AssetAndAmount({ network }: { network: Network }) {
   const { user, getAccessToken } = usePrivy();
   const recipient = user?.wallet?.address;
 
-  const [assets, setAssets] = useState<DepositAsset[] | null>(null);
-  const [assetId, setAssetId] = useState<string | null>(null);
+  const [pickedAssetId, setAssetId] = useState<string | null>(null);
   const [amountText, setAmountText] = useState("");
   const [refundAddress, setRefundAddress] = useState("");
   const [submitting, setSubmitting] = useState(false);
   // Kept raw and translated at render, so the copy follows the language picker.
   const [error, setError] = useState<unknown>(null);
 
+  const { tokens, error: tokensError } = useIntentTokens();
+  const assets = useMemo(() => (tokens ? assetsForNetwork(tokens, network.id) : null), [tokens, network.id]);
+  // The first asset until the user picks one; derived, so a late token list can't override their choice.
+  const assetId = pickedAssetId ?? assets?.[0]?.assetId ?? null;
+
   useEffect(() => {
-    let cancelled = false;
-    getAccessToken()
-      .then((token) => fetchTokens(token))
-      .then((tokens) => {
-        if (cancelled) return;
-        const available = assetsForNetwork(tokens, network.id);
-        setAssets(available);
-        setAssetId(available[0]?.assetId ?? null);
-      })
-      .catch((err) => !cancelled && setError(err ?? new Error("Unknown error")));
-    return () => {
-      cancelled = true;
-    };
-  }, [network.id, getAccessToken]);
+    /* eslint-disable react-hooks/set-state-in-effect --
+       A failed token load shares the screen's error line with quote errors. */
+    if (tokensError) setError(tokensError);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [tokensError]);
 
   const asset = assets?.find((a) => a.assetId === assetId) ?? null;
   const amount = asset ? parseAmount(amountText, asset.decimals) : null;

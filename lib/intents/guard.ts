@@ -115,7 +115,7 @@ async function buildLimiter(rateLimit: NonNullable<GuardConfig["rateLimit"]>): P
   return createMemoryLimiter(rateLimit.limit, rateLimit.windowMs);
 }
 
-export type IntentsRoute = "tokens" | "quote" | "quote-dry" | "status" | "submit";
+export type IntentsRoute = "tokens" | "quote" | "quote-dry" | "status" | "submit" | "history";
 
 /** Limits are counted per route, so status polling does not eat the quote budget. */
 export async function intentsGuard(request: Request, route: IntentsRoute): Promise<Caller | Response> {

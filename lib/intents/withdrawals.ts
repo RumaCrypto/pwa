@@ -105,6 +105,15 @@ export function updateWithdrawal(
   return updated;
 }
 
+/** Every stored withdrawal, for the home screen's activity; unreadable entries are skipped. */
+export function listWithdrawals(storage: DepositStorage): IntentWithdrawal[] {
+  return Object.values(readAll(storage)).flatMap((stored) => {
+    if (stored === null || typeof stored !== "object") return [];
+    const withdrawal = revive(stored);
+    return withdrawal ? [withdrawal] : [];
+  });
+}
+
 export function isWithdrawalSettled(phase: WithdrawalPhase): boolean {
   return phase === "transfer_failed" || (phase !== "awaiting_transfer" && isTerminal(phase));
 }

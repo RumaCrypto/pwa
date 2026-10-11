@@ -88,6 +88,11 @@ export function tokenList(body: unknown): IntentsToken[] | null {
   return Array.isArray(list) ? (list as IntentsToken[]) : null;
 }
 
+/** What the user sees for an Aurora symbol, e.g. "NEAR" for wNEAR. */
+export function displaySymbol(symbol: string): string {
+  return DISPLAY_SYMBOL[symbol] ?? symbol;
+}
+
 export function isNetworkId(value: string): value is NetworkId {
   return NETWORKS.some((network) => network.id === value);
 }
