@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cors, preflight } from "@/lib/http/cors";
 import { auroraApiKey, auroraUrl } from "@/lib/intents/aurora";
 import { intentsGuard } from "@/lib/intents/guard";
 
@@ -7,7 +8,7 @@ export const runtime = "nodejs";
 const FETCH_TIMEOUT_MS = 8000;
 
 /** The token list changes rarely; caching it spares Aurora's per-key rate limit. */
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const caller = await intentsGuard(request, "tokens");
   if (caller instanceof Response) return caller;
 
@@ -27,3 +28,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Could not reach Aurora" }, { status: 502 });
   }
 }
+
+export const GET = cors(handleGet);
+export const OPTIONS = preflight;

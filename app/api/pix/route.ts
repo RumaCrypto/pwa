@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cors, preflight } from "@/lib/http/cors";
 
 export const runtime = "nodejs";
 
@@ -24,7 +25,7 @@ function isDisallowedHost(hostname: string): boolean {
   return false;
 }
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const locationUrl = request.nextUrl.searchParams.get("locationUrl");
   if (!locationUrl) {
     return NextResponse.json({ error: "Missing locationUrl" }, { status: 400 });
@@ -59,3 +60,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export const GET = cors(handleGet);
+export const OPTIONS = preflight;

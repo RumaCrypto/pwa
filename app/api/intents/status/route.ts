@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cors, preflight } from "@/lib/http/cors";
 import { auroraApiKey, auroraUrl } from "@/lib/intents/aurora";
 import { intentsGuard } from "@/lib/intents/guard";
 import { isPlausibleDepositAddress } from "@/lib/intents/status";
@@ -7,7 +8,7 @@ export const runtime = "nodejs";
 
 const FETCH_TIMEOUT_MS = 8000;
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const caller = await intentsGuard(request, "status");
   if (caller instanceof Response) return caller;
 
@@ -36,3 +37,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Could not reach Aurora" }, { status: 502 });
   }
 }
+
+export const GET = cors(handleGet);
+export const OPTIONS = preflight;

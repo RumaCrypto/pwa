@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cors, preflight } from "@/lib/http/cors";
 import { auroraApiKey, auroraUrl } from "@/lib/intents/aurora";
 import { intentsGuard } from "@/lib/intents/guard";
 import { validateSubmission } from "@/lib/intents/submit";
@@ -8,7 +9,7 @@ export const runtime = "nodejs";
 const FETCH_TIMEOUT_MS = 8000;
 
 /** Tells Aurora a withdrawal's transfer is on-chain so it picks it up sooner. Best effort: status polling finds it anyway. */
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   const caller = await intentsGuard(request, "submit");
   if (caller instanceof Response) return caller;
   if (!caller.userId) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
@@ -35,3 +36,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Could not reach Aurora" }, { status: 502 });
   }
 }
+
+export const POST = cors(handlePost);
+export const OPTIONS = preflight;
