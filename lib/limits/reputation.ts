@@ -1,5 +1,4 @@
 import {
-  LIVENESS_DEFAULT_TENANT,
   createLivenessFlow,
   createZkkyc,
   resumeLivenessFlow,
@@ -10,6 +9,7 @@ import { baseClient } from "@/lib/viem";
 
 const REPUTATION_MANAGER = process.env.NEXT_PUBLIC_P2P_REPUTATION_MANAGER_ADDRESS as Address | undefined;
 const LIVENESS_PROXY_URL = process.env.NEXT_PUBLIC_P2P_LIVENESS_PROXY_URL;
+const LIVENESS_TENANT = "p2p-reputation-liveness-mainnet";
 
 /**
  * Every way p2p.me's Reputation Manager can credit Reputation Points (RP),
@@ -85,7 +85,7 @@ export async function startLiveness(walletAddress: Address, returnPath: string):
   const result = await createLivenessFlow({
     baseUrl: LIVENESS_PROXY_URL,
     walletAddress,
-    tenant: LIVENESS_DEFAULT_TENANT,
+    tenant: LIVENESS_TENANT,
     redirectUrl: `${window.location.origin}${returnPath}`,
     state,
   });
