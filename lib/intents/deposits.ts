@@ -97,6 +97,15 @@ export function nextPollAction(phase: DepositPhase, deadline: Date, now: Date): 
   return isExpired({ phase, deadline }, now) ? "expired" : "continue";
 }
 
+/** Every stored deposit, for the home screen's activity; unreadable entries are skipped. */
+export function listDeposits(storage: DepositStorage): IntentDeposit[] {
+  return Object.values(readAll(storage)).flatMap((stored) => {
+    if (stored === null || typeof stored !== "object") return [];
+    const deposit = revive(stored);
+    return Number.isFinite(deposit.createdAt.getTime()) && Number.isFinite(deposit.deadline.getTime()) ? [deposit] : [];
+  });
+}
+
 export function saveDeposit(storage: DepositStorage, deposit: IntentDeposit): void {
   const all = readAll(storage);
   all[deposit.depositAddress] = serialise(deposit);

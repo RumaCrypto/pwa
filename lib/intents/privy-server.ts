@@ -1,7 +1,7 @@
 import "server-only";
 import { PrivyClient } from "@privy-io/node";
 import { sessionCheckFailure } from "./guard";
-import { ownsWallet } from "./wallets";
+import { ethereumWallets, ownsWallet } from "./wallets";
 
 let client: PrivyClient | null = null;
 
@@ -32,4 +32,10 @@ export async function verifyPrivyToken(token: string): Promise<{ userId: string 
 export async function userOwnsWallet(userId: string, address: string): Promise<boolean> {
   const user = await privy().users()._get(userId);
   return ownsWallet(user.linked_accounts, address);
+}
+
+/** The caller's own wallets: the only addresses the history route will ask Aurora about. */
+export async function userWallets(userId: string): Promise<string[]> {
+  const user = await privy().users()._get(userId);
+  return ethereumWallets(user.linked_accounts);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { formatUnits, isAddress, parseUnits } from "viem";
@@ -17,10 +17,10 @@ import { USDC_DECIMALS } from "@/lib/usdc";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { useUsdcBalance } from "@/hooks/use-usdc-balance";
 import { isValidNetworkAddress } from "@/lib/intents/addresses";
-import { findNetwork, isNetworkId, withdrawAssetsForNetwork, type Network, type WithdrawAsset } from "@/lib/intents/networks";
+import { findNetwork, isNetworkId, withdrawAssetsForNetwork, type Network } from "@/lib/intents/networks";
 import { parseAmount } from "@/lib/intents/quote";
 import { WITHDRAW_FEE, maxWithdrawable } from "@/lib/intents/fee";
-import { fetchTokens } from "@/lib/intents/api";
+import { useIntentTokens } from "@/lib/intents/use-intent-tokens";
 import { errorKey } from "@/lib/intents/errors";
 import { saveDraft } from "@/lib/intents/withdraw-draft";
 import { isOwnIntentAddress } from "@/lib/intents/withdrawals";
@@ -37,32 +37,18 @@ export default function WithdrawNetworkPage() {
 function WithdrawForm({ network }: { network: Network }) {
   const router = useRouter();
   const { t } = useI18n();
-  const { user, getAccessToken } = usePrivy();
+  const { user } = usePrivy();
   const owner = user?.wallet?.address;
   const { balance } = useUsdcBalance(owner);
 
-  const [assets, setAssets] = useState<WithdrawAsset[] | null>(null);
-  const [assetId, setAssetId] = useState<string | null>(null);
+  const [pickedAssetId, setAssetId] = useState<string | null>(null);
   // Starts empty on purpose: nothing is ever prefilled from the URL (S5).
   const [recipient, setRecipient] = useState("");
   const [amountText, setAmountText] = useState("");
-  const [loadError, setLoadError] = useState<unknown>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    getAccessToken()
-      .then((token) => fetchTokens(token))
-      .then((tokens) => {
-        if (cancelled) return;
-        const available = withdrawAssetsForNetwork(tokens, network.id);
-        setAssets(available);
-        setAssetId(available[0]?.assetId ?? null);
-      })
-      .catch((err) => !cancelled && setLoadError(err ?? new Error("Unknown error")));
-    return () => {
-      cancelled = true;
-    };
-  }, [network.id, getAccessToken]);
+  const { tokens, error: loadError } = useIntentTokens();
+  const assets = useMemo(() => (tokens ? withdrawAssetsForNetwork(tokens, network.id) : null), [tokens, network.id]);
+  // The first asset until the user picks one; derived, so a late token list can't override their choice.
+  const assetId = pickedAssetId ?? assets?.[0]?.assetId ?? null;
 
   const asset = assets?.find((a) => a.assetId === assetId) ?? null;
   const trimmed = recipient.trim();

@@ -242,7 +242,9 @@ function WithdrawReview() {
             </>
           ) : (
             <Button variant="black" onClick={handleConfirm} disabled={busy || !owner}>
-              {busy ? t(`withdrawFlow.review.step.${step}`) : t("withdrawFlow.review.confirm")}
+              {busy
+                ? t(`withdrawFlow.review.step.${step}`)
+                : t("withdrawFlow.review.confirm", { amount: `${formatUnits(amount, USDC_DECIMALS)} USDC` })}
             </Button>
           )}
           {!unconfirmed && (errorText || changed) && (

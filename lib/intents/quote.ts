@@ -5,7 +5,11 @@ import { WithdrawError } from "./withdraw-errors";
 
 /** 1%. People top up from exchanges that shave fees off, so the exact amount rarely arrives. */
 export const DEPOSIT_SLIPPAGE_BPS = 100;
-/** How long the one-time address accepts a deposit before Aurora starts refunding. */
+/**
+ * The deadline we ask Aurora for. Aurora answers with its own, 72 hours later
+ * (deadline and timeWhenInactive alike), and that is what the deposit screen
+ * shows and expires on: the address really does accept funds that long.
+ */
 export const DEPOSIT_WINDOW_MS = 60 * 60 * 1000;
 /** The route accepts some clock skew over DEPOSIT_WINDOW_MS, but not addresses that live for days. */
 const MAX_DEADLINE_MS = 2 * 60 * 60 * 1000;

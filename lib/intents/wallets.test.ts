@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ownsWallet } from "./wallets";
+import { ethereumWallets, ownsWallet } from "./wallets";
 
 const accounts = [
   { type: "email", address: "a@b.c" },
@@ -24,5 +24,19 @@ describe("ownsWallet", () => {
     expect(ownsWallet(accounts, "0xccc")).toBe(false);
     expect(ownsWallet([], "0xaaa")).toBe(false);
     expect(ownsWallet([null, "x"], "0xaaa")).toBe(false);
+  });
+});
+
+describe("ethereumWallets", () => {
+  it("lists every linked Ethereum wallet and nothing else", () => {
+    expect(
+      ethereumWallets([
+        { type: "email", address: "a@b.c" },
+        { type: "wallet", chain_type: "solana", address: "Sol111" },
+        { type: "wallet", chain_type: "ethereum", address: "0xAAA" },
+        null,
+        { type: "wallet", chain_type: "ethereum", address: "0xBBB" },
+      ])
+    ).toEqual(["0xAAA", "0xBBB"]);
   });
 });

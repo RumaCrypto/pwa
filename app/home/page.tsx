@@ -34,16 +34,54 @@ import { truncateAddress } from "@/lib/format";
 import { useUsername } from "@/lib/settings/use-username";
 import { emailName } from "@/lib/settings/username";
 import { NameSheet } from "@/components/settings/name-sheet";
+import { NetworkLogo } from "@/components/ui/network-logos";
+import { findNetwork } from "@/lib/intents/networks";
+import { listDeposits } from "@/lib/intents/deposits";
+import { listWithdrawals } from "@/lib/intents/withdrawals";
+import { activeIntent, intentActivity, mergeIntentActivity, type IntentActivityItem } from "@/lib/intents/history";
+import { fetchIntentHistory } from "@/lib/intents/api";
 
 export default function HomePage() {
   const router = useRouter();
   const { t } = useI18n();
-  const { ready, authenticated, user } = usePrivy();
+  const { ready, authenticated, user, getAccessToken } = usePrivy();
   const address = user?.wallet?.address;
   const { displayName: ownName, username, email, setUsername } = useUsername();
   const [editingName, setEditingName] = useState(false);
+  const [intents, setIntents] = useState<{ items: IntentActivityItem[]; active: IntentActivityItem | null }>({
+    items: [],
+    active: null,
+  });
 
-  const { balance, loading: balanceLoading } = useUsdcBalance(address);
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect --
+       Deposits and withdrawals live in localStorage, which only exists after mount. */
+    let local: IntentActivityItem[] = [];
+    try {
+      const deposits = listDeposits(localStorage);
+      const withdrawals = listWithdrawals(localStorage);
+      local = intentActivity(deposits, withdrawals);
+      setIntents({ items: local, active: activeIntent(deposits, withdrawals, new Date()) });
+    } catch {
+      // Storage blocked (private mode): the on-chain activity still shows.
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+
+    // Aurora's record covers operations made on other devices; this device's rows show meanwhile.
+    if (!FLAGS.multichainDeposits || !authenticated) return;
+    let cancelled = false;
+    getAccessToken()
+      .then((token) => fetchIntentHistory(token))
+      .then((remote) => {
+        if (!cancelled) setIntents((current) => ({ ...current, items: mergeIntentActivity(local, remote) }));
+      })
+      .catch((err) => console.error("Could not load Aurora history", err instanceof Error ? err.message : "unknown"));
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated, getAccessToken]);
+
+  const { balance, loading: balanceLoading, error: balanceError } = useUsdcBalance(address);
   const { format, formatParts } = useMoney();
   const usdBalance = balance ? fromDecimalString(balance, "USD") : fromMinor(0n, "USD");
   const { money: localBalance, loading: rateLoading } = useConverted(usdBalance);
@@ -74,6 +112,7 @@ export default function HomePage() {
   if (!ready || !authenticated) return null;
 
   const { symbol, integer, decimal, fraction } = formatParts(localBalance ?? usdBalance);
+  const activity = mergeActivity(entries ?? [], intents.items);
   const pending = balanceLoading || rateLoading;
 
   return (
@@ -156,19 +195,28 @@ export default function HomePage() {
           <StatusCard
             key="balance"
             label={t("home.balance.label")}
-            caption={t("home.balance.caption")}
+            caption={balance === null && balanceError ? t("home.balance.unavailable") : t("home.balance.caption")}
             footer={t("home.balance.footer")}
             backgroundImage="/RumaBalanceCardBg.png"
             className="min-h-44"
           >
-            <p style={typography.display1} className={clsx(pending && "opacity-60")}>
-              <small className="text-2xl opacity-60">{symbol}</small>
-              {integer}
-              <small className="text-2xl opacity-60">
-                {decimal}
-                {fraction}
-              </small>
-            </p>
+            {/* Until the first read lands the balance is unknown, not zero: "$0" there reads as lost money. */}
+            {balance === null && !balanceError ? (
+              <span aria-label={t("common.loading")} className="my-2 block h-12 w-40 animate-pulse rounded-xl bg-white/20" />
+            ) : balance === null ? (
+              <p style={typography.display1} className="opacity-60">
+                —
+              </p>
+            ) : (
+              <p style={typography.display1} className={clsx(pending && "opacity-60")}>
+                <small className="text-2xl opacity-60">{symbol}</small>
+                {integer}
+                <small className="text-2xl opacity-60">
+                  {decimal}
+                  {fraction}
+                </small>
+              </p>
+            )}
           </StatusCard>,
           // Until an issuer is connected the card face stays in the carousel as a
           // promise, but with nothing to tap and no number to show.
@@ -190,6 +238,11 @@ export default function HomePage() {
           {t("home.withdrawMoney")}
         </Button>
       </div>
+
+      {/* With the feature off, the deposit and withdrawal screens 404, so nothing may point at them. */}
+      {FLAGS.multichainDeposits && intents.active?.href && (
+        <InProgressCard item={intents.active} onOpen={() => router.push(intents.active!.href!)} />
+      )}
 
       <SectionTitle className="mt-8">{t("home.sendTo")}</SectionTitle>
       <div className="-mx-6 flex gap-4 overflow-x-auto px-6 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -227,11 +280,19 @@ export default function HomePage() {
       </button>
 
       <SectionTitle className="mt-8">{t("home.activity.title")}</SectionTitle>
-      {entries && entries.length > 0 ? (
+      {activity.length > 0 ? (
         <Card divided>
-          {entries.map((entry) => (
-            <ActivityRow key={entry.id} entry={entry} />
-          ))}
+          {activity.map((row) =>
+            row.type === "chain" ? (
+              <ActivityRow key={row.entry.id} entry={row.entry} />
+            ) : (
+              <IntentRow
+                key={row.item.id}
+                item={row.item}
+                onOpen={FLAGS.multichainDeposits && row.item.href ? () => router.push(row.item.href!) : undefined}
+              />
+            )
+          )}
         </Card>
       ) : (
         <p style={typography.body3} className="text-text-secondary">
@@ -312,5 +373,72 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
         </span>
       }
     />
+  );
+}
+
+type ActivityListRow = { type: "chain"; entry: ActivityEntry; at: number } | { type: "intent"; item: IntentActivityItem; at: number };
+
+/**
+ * On-chain history and Aurora deposits/withdrawals, newest first. A withdrawal's
+ * USDC transfer to Aurora's one-time address is the same movement as its intent
+ * row, so the bare transfer is dropped in favour of the row that says where it went.
+ */
+function mergeActivity(entries: ActivityEntry[], intents: IntentActivityItem[]): ActivityListRow[] {
+  const intentAddresses = new Set(
+    intents.filter((i) => i.kind === "withdrawal").map((i) => i.id.slice("withdrawal:".length).toLowerCase())
+  );
+  const rows: ActivityListRow[] = [
+    ...entries
+      .filter((entry) => !intentAddresses.has(entry.counterparty.toLowerCase()))
+      .map((entry) => ({ type: "chain" as const, entry, at: entry.occurredAt.getTime() })),
+    ...intents.map((item) => ({ type: "intent" as const, item, at: item.occurredAt.getTime() })),
+  ];
+  return rows.sort((a, b) => b.at - a.at);
+}
+
+function IntentRow({ item, onOpen }: { item: IntentActivityItem; onOpen?: () => void }) {
+  const { t, language } = useI18n();
+  const { format } = useMoney();
+  const network = findNetwork(item.network);
+  const incoming = item.kind === "deposit";
+
+  return (
+    <ListRow
+      onClick={onOpen}
+      leading={<NetworkLogo network={network} size={36} />}
+      title={t(`home.activity.${item.kind}`, { network: network.name })}
+      subtitle={`${t(`home.activity.status.${item.status}`)} · ${item.other} · ${formatDayAndTime(item.occurredAt, language)}`}
+      trailing={
+        <span
+          style={{ ...typography.label2, fontWeight: 700 }}
+          className={clsx("shrink-0", item.status === "failed" ? "text-text-secondary" : incoming ? "text-success" : "text-text")}
+        >
+          {incoming ? "+" : "-"}
+          {format(fromDecimalString(item.usdc, "USD"))}
+        </span>
+      }
+    />
+  );
+}
+
+/** Points back to a deposit or withdrawal the user may have left the app in the middle of. */
+function InProgressCard({ item, onOpen }: { item: IntentActivityItem; onOpen: () => void }) {
+  const { t } = useI18n();
+  const network = findNetwork(item.network);
+  const detail = item.kind === "deposit" ? `${item.other} → USDC` : `${item.usdc} USDC → ≈ ${item.other}`;
+
+  return (
+    <button onClick={onOpen} className="mt-4 block w-full text-left">
+      <Card className="flex items-center gap-3 px-4 py-4">
+        <NetworkLogo network={network} size={32} />
+        <div className="min-w-0 flex-1">
+          <p style={typography.heading4}>{t(`home.inProgress.${item.kind}`, { network: network.name })}</p>
+          <p style={typography.body4} className="mt-0.5 truncate text-text-secondary">
+            {detail}
+          </p>
+        </div>
+        <Badge variant="dark">{t("home.inProgress.view")}</Badge>
+      </Card>
+    </button>
   );
 }

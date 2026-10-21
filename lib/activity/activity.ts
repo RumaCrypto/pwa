@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fromNumber, type Money } from "@/lib/money/money";
+import type { Money } from "@/lib/money/money";
 import { alchemyActivityProvider } from "./alchemy";
 
 export type ActivityKind = "sent" | "received" | "paid";
@@ -22,45 +22,20 @@ export interface ActivityProvider {
   list(address: string): Promise<ActivityEntry[]>;
 }
 
-/** Used only when no Alchemy key is configured, so the screen still has shape. */
-export const mockActivityProvider: ActivityProvider = {
+/**
+ * Without an Alchemy key there is no history to read. Showing nothing is honest;
+ * the mock that used to stand in made real users see transfers that never happened.
+ */
+export const emptyActivityProvider: ActivityProvider = {
   async list() {
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    const now = Date.now();
-
-    return [
-      {
-        id: "RM-719049",
-        kind: "sent",
-        counterparty: "Rosa",
-        amount: fromNumber(-200, "USD"),
-        status: "delivered",
-        occurredAt: new Date(now - 20 * 3_600_000),
-      },
-      {
-        id: "RM-718912",
-        kind: "paid",
-        counterparty: "Tienda Don Beto",
-        amount: fromNumber(-20, "USD"),
-        status: "delivered",
-        occurredAt: new Date(now - 30 * 3_600_000),
-      },
-      {
-        id: "RM-718340",
-        kind: "received",
-        counterparty: "Juan Carlos",
-        amount: fromNumber(150, "USD"),
-        status: "delivered",
-        occurredAt: new Date(now - 76 * 3_600_000),
-      },
-    ];
+    return [];
   },
 };
 
-/** Alchemy needs a key; without one the mock keeps the screen usable in development. */
+/** Alchemy needs a key; without one the list stays empty (Aurora rows still show on home). */
 export const defaultActivityProvider: ActivityProvider = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
   ? alchemyActivityProvider
-  : mockActivityProvider;
+  : emptyActivityProvider;
 
 export function useActivity(
   address: string | undefined,

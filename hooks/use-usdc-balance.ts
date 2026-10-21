@@ -8,6 +8,8 @@ import { USDC_ADDRESS_BASE, USDC_DECIMALS, erc20BalanceOfAbi } from "@/lib/usdc"
 export function useUsdcBalance(address: string | undefined) {
   const [balance, setBalance] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Separate from loading: a failed read must not look like a zero balance.
+  const [error, setError] = useState(false);
 
   const refetch = useCallback(async () => {
     if (!address || !isAddress(address)) return;
@@ -21,7 +23,9 @@ export function useUsdcBalance(address: string | undefined) {
         args: [address as Address],
       });
       setBalance(formatUnits(raw, USDC_DECIMALS));
+      setError(false);
     } catch (err) {
+      setError(true);
       console.error("Failed to fetch USDC balance on Base", err);
     } finally {
       setLoading(false);
@@ -32,5 +36,5 @@ export function useUsdcBalance(address: string | undefined) {
     refetch();
   }, [refetch]);
 
-  return { balance, loading, refetch };
+  return { balance, loading, error, refetch };
 }
