@@ -103,19 +103,39 @@ export default function WithdrawAmountStep() {
           <small className="text-3xl opacity-50">$</small>
           {formatDraft(draft, LOCALES[language], "USD") || "0"}
         </p>
-        <p style={typography.body4} className="mt-1 text-text-secondary">
-          {balance !== null ? (
-            t("withdrawFlow.amount.balance", {
-              amount: new Intl.NumberFormat(LOCALES[language], { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-                Number(available!.amount) / 100
-              ),
-            })
-          ) : balanceError ? (
-            t("withdrawFlow.amount.balance", { amount: "—" })
-          ) : (
-            <span aria-label={t("common.loading")} className="inline-block h-4 w-28 animate-pulse rounded bg-card align-middle" />
-          )}
-        </p>
+        {/* What can actually leave once the fee is counted, next to the shortcuts that use it. */}
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <p style={typography.body4} className="whitespace-nowrap text-text-secondary">
+            {available !== null ? (
+              t("withdrawFlow.amount.available", { amount: format(maxSend(available)) })
+            ) : balanceError ? (
+              t("withdrawFlow.amount.available", { amount: "—" })
+            ) : (
+              <span aria-label={t("common.loading")} className="inline-block h-4 w-28 animate-pulse rounded bg-card align-middle" />
+            )}
+          </p>
+          <div className="flex shrink-0 gap-1">
+            {SHARES.map((percent) => {
+              const share = available ? shareOfMax(available, percent) : null;
+              const active = draft !== "" && share !== null && share.amount === send.amount;
+              return (
+                <button
+                  key={percent}
+                  disabled={!canUseShares}
+                  aria-pressed={active}
+                  onClick={() => share && setDraft(toDraft(share))}
+                  style={typography.label4}
+                  className={clsx(
+                    "h-8 rounded-full border px-2.5 transition-colors disabled:opacity-40",
+                    active ? "border-primary bg-primary-light text-primary-dark" : "border-border-light bg-white active:bg-card"
+                  )}
+                >
+                  {percent === 100 ? t("withdrawFlow.form.max") : `${percent}%`}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="my-4 border-t border-border-light" />
 
@@ -145,21 +165,8 @@ export default function WithdrawAmountStep() {
         </p>
       )}
 
-      <div className="mt-5 grid grid-cols-3 gap-3">
-        {SHARES.map((percent) => (
-          <button
-            key={percent}
-            disabled={!canUseShares}
-            onClick={() => available && setDraft(toDraft(shareOfMax(available, percent)))}
-            style={typography.label1}
-            className="h-12 rounded-xl border border-border-light bg-white active:bg-card disabled:opacity-50"
-          >
-            {percent === 100 ? t("withdrawFlow.form.max") : `${percent}%`}
-          </button>
-        ))}
-      </div>
 
-      <div className="mt-3">
+      <div className="mt-5">
         <Keypad
           decimalSeparator={separator}
           backspaceLabel={t("common.back")}
