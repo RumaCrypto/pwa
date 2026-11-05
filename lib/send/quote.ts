@@ -19,7 +19,7 @@ export interface Quote {
   expiresAt: Date;
 }
 
-function feeOn(amount: Money): Money {
+export function feeOn(amount: Money): Money {
   const cents = BigInt(Math.round(Number(amount.amount) * FEE_RATE));
   return fromMinor(cents, amount.currency);
 }
