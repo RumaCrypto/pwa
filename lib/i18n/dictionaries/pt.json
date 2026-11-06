@@ -690,6 +690,8 @@
   "cashflow.receive.title": "Receber dólares digitais",
   "cashflow.receive.hint": "Envie USDC na rede Base para este endereço. O que for enviado por outra rede pode-se perder.",
   "cashflow.receive.address": "Seu endereço",
+  "cashflow.receive.ensName": "Seu nome ENS",
+  "cashflow.receive.copyEnsName": "Copiar nome ENS",
   "cashflow.receive.network": "Rede",
   "cashflow.receive.asset": "Ativo",
   "cashflow.receive.copy": "Copiar endereço",
