@@ -53,8 +53,13 @@ export function chainReader(client: ChainClient, registrar: Address): UsernameRe
       (await client.readContract({ address: registrar, abi: rumaRegistrarAbi, functionName: "labelOf", args: [address] })) as string,
     isAvailable: async (label) =>
       (await client.readContract({ address: registrar, abi: rumaRegistrarAbi, functionName: "isAvailable", args: [label] })) as boolean,
-    resolve: (name) => client.getEnsAddress({ name: normalize(name), coinType: BASE_COIN_TYPE }),
+    ...ensResolver(client),
   };
+}
+
+/** Just name → address, which needs the Universal Resolver. */
+export function ensResolver(client: Pick<ChainClient, "getEnsAddress">): Pick<UsernameReader, "resolve"> {
+  return { resolve: (name) => client.getEnsAddress({ name: normalize(name), coinType: BASE_COIN_TYPE }) };
 }
 
 /**
@@ -70,6 +75,6 @@ export async function lookupHandle(reader: UsernameReader, address: Address): Pr
 }
 
 /** The Base address behind a username, or null if nobody has it. */
-export function resolveHandle(reader: UsernameReader, label: string): Promise<Address | null> {
+export function resolveHandle(reader: Pick<UsernameReader, "resolve">, label: string): Promise<Address | null> {
   return reader.resolve(fullEnsName(label));
 }

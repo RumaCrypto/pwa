@@ -13,7 +13,6 @@ import { useContacts } from "@/lib/contacts/contacts-context";
 import {
   COUNTRIES,
   countryName,
-  isValidRumaAddress,
   localPayoutFieldLabel,
   localPayoutFieldPlaceholder,
   localPayoutFields,
@@ -22,8 +21,12 @@ import {
   payoutKindsFor,
   validateLocalPayoutFields,
   type Contact,
+  type Payout,
   type PayoutKind,
 } from "@/lib/contacts/contacts";
+import { mainnetClient } from "@/lib/viem";
+import { ensResolver } from "@/lib/usernames/registrar";
+import { UsernameNotFoundError, parseRumaRecipient, resolveRumaRecipient } from "@/lib/usernames/recipient";
 
 interface AddContactSheetProps {
   open: boolean;
@@ -41,6 +44,8 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
   const [reference, setReference] = useState("");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  /** True while a username is being looked up on-chain. */
+  const [saving, setSaving] = useState(false);
 
   const kinds = payoutKindsFor(country);
   const fields = localPayoutFields(country);
@@ -66,25 +71,49 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
   const setFieldValue = (key: string, value: string) =>
     setFieldValues((current) => ({ ...current, [key]: value }));
 
-  const handleSave = () => {
+  const rumaPayout = async (): Promise<Payout | string> => {
+    const input = parseRumaRecipient(reference);
+    switch (input.kind) {
+      case "address":
+        return { kind: "ruma", reference: input.address };
+      case "invalidAddress":
+        return t("contacts.add.invalidAddress");
+      case "notFound":
+        return t("errors.usernameNotFound");
+      case "handle":
+        try {
+          const address = await resolveRumaRecipient(ensResolver(mainnetClient), input.label);
+          return { kind: "ruma", reference: address, handle: input.label };
+        } catch (err) {
+          return err instanceof UsernameNotFoundError ? t("errors.usernameNotFound") : t("errors.usernameResolveFailed");
+        }
+    }
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
     if (!name.trim()) return setError(t("contacts.add.nameRequired"));
 
-    let payoutReference: string;
+    let payout: Payout;
     if (kind === "local") {
       const validationError = validateLocalPayoutFields(country, fieldValues);
       if (validationError) return setError(validationError);
-      payoutReference = packLocalPayoutReference(country, fieldValues);
+      payout = { kind, reference: packLocalPayoutReference(country, fieldValues) };
     } else {
       if (!reference.trim()) return setError(t("contacts.add.referenceRequired"));
-      if (kind === "ruma" && !isValidRumaAddress(reference)) return setError(t("contacts.add.invalidAddress"));
-      payoutReference = reference.trim();
+      if (kind === "ruma") {
+        setError(null);
+        setSaving(true);
+        const result = await rumaPayout();
+        setSaving(false);
+        if (typeof result === "string") return setError(result);
+        payout = result;
+      } else {
+        payout = { kind, reference: reference.trim() };
+      }
     }
 
-    const created = addContact({
-      name: name.trim(),
-      country,
-      payout: { kind, reference: payoutReference },
-    });
+    const created = addContact({ name: name.trim(), country, payout });
 
     reset();
     onAdded?.(created);
@@ -97,7 +126,11 @@ export function AddContactSheet({ open, onClose, onAdded }: AddContactSheetProps
       onClose={onClose}
       title={t("contacts.add.title")}
       closeLabel={t("common.cancel")}
-      footer={<Button onClick={handleSave}>{t("contacts.add.save")}</Button>}
+      footer={
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? t("contacts.add.checking") : t("contacts.add.save")}
+        </Button>
+      }
     >
       <p style={typography.body3} className="mb-5 text-text-secondary">
         {t("contacts.add.subtitle")}

@@ -36,7 +36,7 @@ export default function SendRecipientStep() {
     const needle = query.trim().toLowerCase();
     if (!needle) return contacts;
     return contacts.filter((contact) =>
-      [contact.name, contact.payout.reference]
+      [contact.name, contact.payout.reference, contact.payout.handle ?? ""]
         .join(" ")
         .toLowerCase()
         .includes(needle)
