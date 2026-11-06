@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { useI18n } from "@/lib/i18n/i18n-context";
@@ -10,14 +9,13 @@ import { CURRENCIES, CURRENCY_CODES } from "@/lib/money/currencies";
 import { fromNumber } from "@/lib/money/money";
 import { COUNTRIES, countryName } from "@/lib/contacts/contacts";
 import { useResidency } from "@/lib/settings/residency-context";
-import { useUsername } from "@/lib/settings/use-username";
-import { USERNAME_MAX_LENGTH, emailName, normalizeUsername } from "@/lib/settings/username";
+import { useHandle } from "@/lib/usernames/use-handle";
+import { formatHandle } from "@/lib/usernames/handle";
+import { USERNAMES_ENABLED } from "@/lib/usernames/registrar";
 import { Screen } from "@/components/ui/screen";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { Callout } from "@/components/ui/callout";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { typography } from "@/constants/typography";
 
 export default function SettingsPage() {
@@ -89,46 +87,24 @@ export default function SettingsPage() {
   );
 }
 
+/** Read-only: a username is permanent once claimed. Without one, links to the claim screen. */
 function UsernameSection() {
   const { t } = useI18n();
-  const { username, email, setUsername } = useUsername();
-  const [draft, setDraft] = useState("");
-  const [saved, setSaved] = useState(false);
+  const router = useRouter();
+  const { user } = usePrivy();
+  const { handle, checked } = useHandle(user?.wallet?.address);
 
-  useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect --
-       The stored name is read after mount; mirror it into the field once known. */
-    setDraft(username ?? "");
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [username]);
-
-  const unchanged = normalizeUsername(draft) === username;
-
-  const save = () => {
-    setUsername(draft);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
+  if (!USERNAMES_ENABLED || (!handle && !checked)) return null;
 
   return (
     <Section title={t("settings.username")} hint={t("settings.usernameHint")}>
-      <div className="flex gap-2">
-        <Input
-          className="min-w-0 flex-1"
-          maxLength={USERNAME_MAX_LENGTH}
-          placeholder={emailName(email) ?? t("settings.usernamePlaceholder")}
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            setSaved(false);
-          }}
-        />
-        <div className="w-28 shrink-0">
-          <Button variant="black" onClick={save} disabled={unchanged}>
-            {saved ? t("settings.usernameSaved") : t("settings.usernameSave")}
-          </Button>
-        </div>
-      </div>
+      <Card divided>
+        {handle ? (
+          <ListRow title={formatHandle(handle)} />
+        ) : (
+          <ListRow title={t("settings.usernameChoose")} chevron onClick={() => router.push("/onboarding/username")} />
+        )}
+      </Card>
     </Section>
   );
 }

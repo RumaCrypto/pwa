@@ -100,7 +100,10 @@ export function redisCredentials(
 }
 
 /** Redis when Upstash is connected (exact across Vercel instances), memory otherwise. */
-async function buildLimiter(rateLimit: NonNullable<GuardConfig["rateLimit"]>): Promise<Limiter> {
+export async function buildLimiter(
+  rateLimit: NonNullable<GuardConfig["rateLimit"]>,
+  prefix = "ruma:intents"
+): Promise<Limiter> {
   const credentials = redisCredentials();
   if (credentials) {
     const { Ratelimit } = await import("@upstash/ratelimit");
@@ -108,7 +111,7 @@ async function buildLimiter(rateLimit: NonNullable<GuardConfig["rateLimit"]>): P
     const ratelimit = new Ratelimit({
       redis: new Redis(credentials),
       limiter: Ratelimit.slidingWindow(rateLimit.limit, `${rateLimit.windowMs / 1000} s`),
-      prefix: "ruma:intents",
+      prefix,
     });
     return async (key) => (await ratelimit.limit(key)).success;
   }
