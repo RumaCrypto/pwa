@@ -201,4 +201,14 @@ describe("formatLocalPayoutReference and payoutReferenceDisplay", () => {
     const ruma: Contact = { id: "2", name: "Rosa", country: "EC", payout: { kind: "ruma", reference: "rosa123" } };
     expect(payoutReferenceDisplay(ruma, "en")).toBe("rosa123");
   });
+
+  it("shows a Ruma contact added by username as @username, not their address", () => {
+    const byHandle: Contact = {
+      id: "3",
+      name: "Rosa",
+      country: "EC",
+      payout: { kind: "ruma", reference: "0x5aeda56215b167893e80b4fe645ba6d5bab767de", handle: "rosa123" },
+    };
+    expect(payoutReferenceDisplay(byHandle, "en")).toBe("@rosa123");
+  });
 });

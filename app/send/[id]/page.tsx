@@ -15,6 +15,7 @@ import { typography } from "@/constants/typography";
 import { formatEther } from "viem";
 
 import { truncateAddress } from "@/lib/format";
+import { formatHandle } from "@/lib/usernames/handle";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { LOCALES } from "@/lib/i18n/languages";
 import { useContacts } from "@/lib/contacts/contacts-context";
@@ -78,7 +79,7 @@ export default function SendTrackingScreen() {
   const name = contact ? displayName(contact) : t("common.to");
 
   if (order.kind === "ruma") {
-    return <RumaTransferScreen order={order} name={name} contactName={contact?.name} country={contact ? countryName(contact.country, language) : undefined} address={contact?.payout.reference} />;
+    return <RumaTransferScreen order={order} name={name} contactName={contact?.name} country={contact ? countryName(contact.country, language) : undefined} address={contact?.payout.reference} handle={contact?.payout.handle} />;
   }
 
   const failed = order.phase === "failed";
@@ -174,13 +175,15 @@ interface RumaTransferScreenProps {
   contactName?: string;
   country?: string;
   address?: string;
+  /** The contact's username, shown in place of the address when they were added by one. */
+  handle?: string;
 }
 
 /**
  * A plain USDC transfer has no merchant and no conversion, so it gets its own
  * two-step view: submitted on the blockchain, then confirmed by its receipt.
  */
-function RumaTransferScreen({ order, name, contactName, country, address }: RumaTransferScreenProps) {
+function RumaTransferScreen({ order, name, contactName, country, address, handle }: RumaTransferScreenProps) {
   const router = useRouter();
   const { t } = useI18n();
   const { format } = useMoney();
@@ -247,7 +250,13 @@ function RumaTransferScreen({ order, name, contactName, country, address }: Ruma
         <DetailRow label={t("sendFlow.track.recipient")} value={contactName ?? "—"} />
         <DetailRow
           label={t("sendFlow.track.receivesIn")}
-          value={address ? `${t("contacts.payout.ruma")} ·· ${truncateAddress(address)}` : "—"}
+          value={
+            handle
+              ? `${t("contacts.payout.ruma")} ·· ${formatHandle(handle)}`
+              : address
+                ? `${t("contacts.payout.ruma")} ·· ${truncateAddress(address)}`
+                : "—"
+          }
         />
         {country && <DetailRow label={t("contacts.add.country")} value={country} />}
         <DetailRow

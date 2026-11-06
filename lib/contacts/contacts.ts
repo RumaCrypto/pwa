@@ -12,6 +12,7 @@ import {
 import { CURRENCIES, CURRENCY_CODES, currencyForCountry, type CurrencyCode } from "@/lib/money/currencies";
 import { LOCALES, type Language } from "@/lib/i18n/languages";
 import { FLAGS, type Flags } from "@/lib/flags";
+import { formatHandle } from "@/lib/usernames/handle";
 
 /** Countries p2p.me can pay out to. Keep in sync with the offramp corridor. */
 const SUPPORTED_SENDING_COUNTRIES = ["Colombia", "Peru", "Ecuador", "Venezuela", "Argentina", "Bolivia", "Brazil"];
@@ -149,6 +150,8 @@ export function isValidRumaAddress(reference: string): boolean {
 export interface Payout {
   kind: PayoutKind;
   reference: string;
+  // "ruma" only: the username the contact was added by, without .rumalatam.eth.
+  handle?: string;
 }
 
 export interface Contact {
@@ -247,8 +250,9 @@ export function formatLocalPayoutReference(country: string, reference: string, l
     .join(" | ");
 }
 
-/** Human-readable form of a contact's payout reference — labeled fields for local methods, verbatim otherwise. */
+/** Human-readable form of a contact's payout reference — labeled fields for local methods, @username for Ruma users who have one, verbatim otherwise. */
 export function payoutReferenceDisplay(contact: Contact, language: Language): string {
+  if (contact.payout.kind === "ruma" && contact.payout.handle) return formatHandle(contact.payout.handle);
   if (contact.payout.kind !== "local") return contact.payout.reference;
   return formatLocalPayoutReference(contact.country, contact.payout.reference, language) || contact.payout.reference;
 }

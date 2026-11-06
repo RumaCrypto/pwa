@@ -10,6 +10,7 @@ import { typography } from "@/constants/typography";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { COUNTRIES, countryName } from "@/lib/contacts/contacts";
 import { useResidency } from "@/lib/settings/residency-context";
+import { USERNAMES_ENABLED } from "@/lib/usernames/registrar";
 
 export default function OnboardingCountryStep() {
   const router = useRouter();
@@ -18,7 +19,8 @@ export default function OnboardingCountryStep() {
 
   const choose = (country: string) => {
     setCountry(country);
-    router.replace("/home");
+    // The username step sends people who already have one straight on to home.
+    router.replace(USERNAMES_ENABLED ? "/onboarding/username" : "/home");
   };
 
   return (

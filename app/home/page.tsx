@@ -31,17 +31,17 @@ import { MAX_LEVEL } from "@/lib/limits/limits";
 import { FLAGS } from "@/lib/flags";
 import { formatDayAndTime } from "@/lib/datetime";
 import { truncateAddress } from "@/lib/format";
-import { useUsername } from "@/lib/settings/use-username";
-import { emailName } from "@/lib/settings/username";
-import { NameSheet } from "@/components/settings/name-sheet";
+import { useHandle } from "@/lib/usernames/use-handle";
+import { formatHandle } from "@/lib/usernames/handle";
+import { USERNAMES_ENABLED } from "@/lib/usernames/registrar";
 
 export default function HomePage() {
   const router = useRouter();
   const { t } = useI18n();
   const { ready, authenticated, user } = usePrivy();
   const address = user?.wallet?.address;
-  const { displayName: ownName, username, email, setUsername } = useUsername();
-  const [editingName, setEditingName] = useState(false);
+  const { handle, checked: handleChecked } = useHandle(address);
+  const ownName = handle ? formatHandle(handle) : null;
 
   const { balance, loading: balanceLoading } = useUsdcBalance(address);
   const { format, formatParts } = useMoney();
@@ -96,7 +96,7 @@ export default function HomePage() {
             <Badge className="max-w-full gap-2 py-1.5 pl-1.5 pr-3">
               <span className="h-5 w-5 shrink-0 rounded-full bg-primary" />
               <span className="flex min-w-0 flex-col items-start text-left leading-tight">
-                {/* A chosen name or the email takes the label's place; without one, say what the address is. */}
+                {/* The username takes the label's place; without one, say what the address is. */}
                 {ownName ? (
                   <span className="max-w-full truncate">{ownName}</span>
                 ) : (
@@ -118,9 +118,13 @@ export default function HomePage() {
                 ))}
             </Badge>
           </button>
-          {/* Passkey sign-ups have no email to borrow a name from, so invite them to set one here. */}
-          {!ownName && address && (
-            <button onClick={() => setEditingName(true)} style={typography.label5} className="pl-1 text-primary active:opacity-70">
+          {/* Only once the chain has confirmed there's no name, so it doesn't flash for people who have one. */}
+          {USERNAMES_ENABLED && handleChecked && !handle && address && (
+            <button
+              onClick={() => router.push("/onboarding/username")}
+              style={typography.label5}
+              className="pl-1 text-primary active:opacity-70"
+            >
               {t("home.addName")}
             </button>
           )}
@@ -142,14 +146,6 @@ export default function HomePage() {
           </button>
         </div>
       </header>
-
-      <NameSheet
-        open={editingName}
-        onClose={() => setEditingName(false)}
-        current={username}
-        placeholder={emailName(email) ?? t("settings.usernamePlaceholder")}
-        onSave={setUsername}
-      />
 
       <Carousel className="mt-6">
         {[

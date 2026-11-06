@@ -21,6 +21,7 @@ import { useMoney } from "@/lib/money/money-context";
 import { isExpired } from "@/lib/send/quote";
 import { useLimits } from "@/lib/limits/limits-context";
 import { useP2pWalletClient } from "@/hooks/use-p2p-wallet-client";
+import { UsernameLookupError, UsernameNotFoundError } from "@/lib/usernames/recipient";
 
 export default function SendReviewStep() {
   const router = useRouter();
@@ -68,7 +69,10 @@ export default function SendReviewStep() {
       reset();
       router.replace(`/send/${order.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      // Username problems get their own sentence; everything else is an order failure.
+      if (err instanceof UsernameNotFoundError) setError(t("errors.usernameNotFound"));
+      else if (err instanceof UsernameLookupError) setError(t("errors.usernameResolveFailed"));
+      else setError(t("sendFlow.step3.orderFailed", { error: err instanceof Error ? err.message : String(err) }));
       setSubmitting(false);
     }
   };
@@ -85,7 +89,7 @@ export default function SendReviewStep() {
           </Button>
           {error && (
             <p style={typography.body5} className="mt-3 text-center text-danger">
-              {t("sendFlow.step3.orderFailed", { error })}
+              {error}
             </p>
           )}
           <p style={typography.body5} className="mt-3 text-center text-text-secondary">

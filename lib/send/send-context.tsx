@@ -5,6 +5,9 @@ import { isAddress, type Address, type WalletClient } from "viem";
 
 import type { Contact } from "@/lib/contacts/contacts";
 import { sdkCurrencyForCountry } from "@/lib/contacts/contacts";
+import { mainnetClient } from "@/lib/viem";
+import { ensResolver } from "@/lib/usernames/registrar";
+import { resolveRumaRecipient } from "@/lib/usernames/recipient";
 import { getP2pOrders } from "./p2p-orders";
 import { placeSellOrder, sendUsdcTransfer } from "./order-execution";
 import type { Order, P2pOrder, RumaTransferOrder } from "./orders";
@@ -155,7 +158,10 @@ export function SendProvider({ children }: { children: ReactNode }) {
     // wallet — both sides already hold USDC, so there's no fiat leg, no
     // merchant, and no p2p.me sell order to place.
     if (contact.payout.kind === "ruma") {
-      const to = contact.payout.reference;
+      // A username is resolved fresh on every send: ENS is the source of truth,
+      const to = contact.payout.handle
+        ? await resolveRumaRecipient(ensResolver(mainnetClient), contact.payout.handle)
+        : contact.payout.reference;
       if (!isAddress(to)) throw new Error("This contact's Ruma address looks invalid.");
 
       const txHash = await sendUsdcTransfer({ walletClient, userAddress, to, usdcAmount });
