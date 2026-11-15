@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Screen } from "@/components/ui/screen";
 import { Button } from "@/components/ui/button";
 import { RadioCard } from "@/components/ui/radio-card";
+import { PriceBadge } from "@/components/price/price-badge";
 import { typography } from "@/constants/typography";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
@@ -30,6 +31,8 @@ export default function AddMoneyScreen() {
       <h2 style={typography.display3} className="mb-6">
         {t("cashflow.add.question")}
       </h2>
+
+      <PriceBadge side="buy" href="/add-money/price" className="mb-6" />
 
       <div role="radiogroup" className="flex flex-col gap-3">
         {methods.map((option) => (
