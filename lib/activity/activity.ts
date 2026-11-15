@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fromNumber, type Money } from "@/lib/money/money";
 import { alchemyActivityProvider } from "./alchemy";
 
@@ -87,5 +87,16 @@ export function useActivity(
     };
   }, [address, provider]);
 
-  return { entries, error, loading: entries === null };
+  /** Fetches again without clearing what's shown, so a pull-to-refresh doesn't flash "Loading". */
+  const refetch = useCallback(async () => {
+    if (!address) return;
+    try {
+      setEntries(await provider.list(address));
+      setError(null);
+    } catch (failure) {
+      setError(failure as Error);
+    }
+  }, [address, provider]);
+
+  return { entries, error, loading: entries === null, refetch };
 }
