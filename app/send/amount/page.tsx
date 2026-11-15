@@ -22,7 +22,8 @@ import { useMoney } from "@/lib/money/money-context";
 import { appendDecimal, appendDigit, backspace, formatDraft, toMoney } from "@/lib/money/amount-input";
 import { convert } from "@/lib/money/money";
 import { buildQuote } from "@/lib/send/quote";
-import { useLimits } from "@/lib/limits/limits-context";
+import { usePrivy } from "@privy-io/react-auth";
+import { useTxLimits } from "@/hooks/use-tx-limits";
 
 const QUICK = [20, 50, 100];
 
@@ -41,7 +42,10 @@ export default function SendAmountStep() {
   const rate = isRuma ? 1 : fetchedRate;
   const loading = !isRuma && rateLoading;
   const error = !isRuma && rateError;
-  const { limits } = useLimits();
+  const { user } = usePrivy();
+  // The order settles in the contact's corridor, so that is the limit that applies.
+  // A Ruma contact is a plain USDC transfer that never touches p2p.me's limits.
+  const { limits } = useTxLimits(user?.wallet?.address, contact && !isRuma ? contact.country : null);
 
   useEffect(() => {
     // Waiting for `loaded` matters most right after creating a contact, when the
@@ -53,7 +57,8 @@ export default function SendAmountStep() {
 
   const send = toMoney(draft, "USD");
   const receive = rate !== null ? convert(send, rate, target) : null;
-  const overLimit = send.amount > limits.perSend.amount;
+  const sellLimit = !isRuma && limits && receive && limits.sell.currency === receive.currency ? limits.sell : null;
+  const overLimit = sellLimit !== null && receive !== null && receive.amount > sellLimit.amount;
   const ready = send.amount > 0n && rate !== null && !overLimit;
 
   const separator =
@@ -128,7 +133,7 @@ export default function SendAmountStep() {
 
       {overLimit && (
         <p style={typography.body4} className="mt-3 text-danger">
-          {t("sendFlow.step2.overLimit", { limit: format(limits.perSend) })}
+          {t("sendFlow.step2.overLimit", { limit: format(sellLimit!) })}
         </p>
       )}
 

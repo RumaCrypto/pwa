@@ -18,7 +18,7 @@ import { typography } from "@/constants/typography";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { useMoney } from "@/lib/money/money-context";
 import { useResidency } from "@/lib/settings/residency-context";
-import { useTxLimits } from "@/hooks/use-tx-limits";
+import { useLimits } from "@/lib/limits/limits-context";
 import { useP2pWalletClient } from "@/hooks/use-p2p-wallet-client";
 import {
   ENABLED_METHODS,
@@ -52,7 +52,8 @@ export default function LimitsScreen() {
   const { country, loaded } = useResidency();
   const address = user?.wallet?.address as Address | undefined;
 
-  const { limits, loading, refetch: refetchLimits } = useTxLimits(address, country);
+  // Shared with home, so a refetch after a verification updates both.
+  const { limits, loading, refetch: refetchLimits } = useLimits();
   const [verified, setVerified] = useState<Partial<Record<VerificationMethod, boolean>>>({});
   const [phase, setPhase] = useState<LivenessPhase>("idle");
   const [error, setError] = useState<string | null>(null);

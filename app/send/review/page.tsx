@@ -19,7 +19,6 @@ import { countryName, displayName, payoutReferenceDisplay } from "@/lib/contacts
 import { useSend } from "@/lib/send/send-context";
 import { useMoney } from "@/lib/money/money-context";
 import { isExpired } from "@/lib/send/quote";
-import { useLimits } from "@/lib/limits/limits-context";
 import { useP2pWalletClient } from "@/hooks/use-p2p-wallet-client";
 
 export default function SendReviewStep() {
@@ -28,7 +27,6 @@ export default function SendReviewStep() {
   const { findContact, loaded } = useContacts();
   const { contactId, quote, placeOrder, reset } = useSend();
   const { format } = useMoney();
-  const { recordCompletedSend } = useLimits();
   const getWalletClient = useP2pWalletClient();
 
   const contact = contactId ? findContact(contactId) : undefined;
@@ -64,7 +62,6 @@ export default function SendReviewStep() {
     try {
       const { walletClient, address } = await getWalletClient();
       const order = await placeOrder({ quote, contact, walletClient, userAddress: address });
-      recordCompletedSend();
       reset();
       router.replace(`/send/${order.id}`);
     } catch (err) {

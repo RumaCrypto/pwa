@@ -140,7 +140,7 @@ export function createP2pBuyCountryOverride(prices: Prices) {
   };
 }
 
-const p2pPrices = createPrices({
+export const p2pPrices = createPrices({
   publicClient: baseClient,
   diamondAddress: DIAMOND_ADDRESS ?? "0x0000000000000000000000000000000000000000",
 });
