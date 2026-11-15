@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Mail, Fingerprint } from "lucide-react";
 import { OTPInput, SlotProps } from "input-otp";
 import clsx from "clsx";
-import { usePrivy, useLoginWithEmail, useLoginWithPasskey, useSignupWithPasskey, useCreateWallet } from "@privy-io/react-auth";
+import { usePrivy, useLoginWithEmail, useLoginWithPasskey, useSignupWithPasskey } from "@privy-io/react-auth";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { useResidency } from "@/lib/settings/residency-context";
 import { Button } from "@/components/ui/button";
@@ -14,23 +14,19 @@ import { typography } from "@/constants/typography";
 
 type Step = "method" | "email" | "code";
 
-const PASSKEY_ACCOUNT_EXISTS_KEY = 'privy_passkey_account_exists';
-
 export default function LoginMethodStep() {
   const { t } = useI18n();
   const router = useRouter();
-  const { user, authenticated } = usePrivy();
+  const { authenticated } = usePrivy();
   const { sendCode, loginWithCode, state: emailState } = useLoginWithEmail();
   const { loginWithPasskey, state: passkeyState } = useLoginWithPasskey();
   const { signupWithPasskey, state: signupPasskeyState } = useSignupWithPasskey();
-  const { createWallet } = useCreateWallet();
   const { country, loaded: residencyLoaded } = useResidency();
 
   const [step, setStep] = useState<Step>("method");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [hasPasskeyAccount, setHasPasskeyAccount] = useState<boolean | null>(null);
 
   useEffect(() => {
     // Wait on `residencyLoaded` so a returning user with a country already
@@ -39,39 +35,24 @@ export default function LoginMethodStep() {
     router.replace(country ? "/home" : "/onboarding/country");
   }, [authenticated, residencyLoaded, country, router]);
 
-  useEffect(() => {
-    const loadPasskeyStatus = () => {
-      try {
-        const exists = localStorage.getItem(PASSKEY_ACCOUNT_EXISTS_KEY);
-        setHasPasskeyAccount(exists === 'true');
-      } catch (error) {
-        console.error('Failed to load passkey status:', error);
-        setHasPasskeyAccount(false);
-      }
-    };
-    loadPasskeyStatus();
-  }, []);
-
-  const handlePasskey = async () => {
+  // Sign-in and sign-up are separate actions: a local flag can't tell whether
+  // the user already has a passkey (new device, installed PWA, cleared data).
+  // The embedded wallet is created by Privy's `createOnLogin` config.
+  const handlePasskeyLogin = async () => {
     setError(null);
     try {
-      if (hasPasskeyAccount) {
-        // User has existing passkey, login
-        await loginWithPasskey();
-      } else {
-        // First time, signup
-        await signupWithPasskey();
-        // Mark that passkey account now exists
-        localStorage.setItem(PASSKEY_ACCOUNT_EXISTS_KEY, 'true');
-        setHasPasskeyAccount(true);
-      }
-      
-      let wallet = user?.wallet;
-      if (!wallet) {
-        wallet = await createWallet();
-      }
+      await loginWithPasskey();
     } catch {
-      setError(t("onboarding.liveness.error"));
+      setError(t("onboarding.loginMethod.passkeyLoginError"));
+    }
+  };
+
+  const handlePasskeySignup = async () => {
+    setError(null);
+    try {
+      await signupWithPasskey();
+    } catch {
+      setError(t("onboarding.loginMethod.passkeySignupError"));
     }
   };
 
@@ -89,11 +70,6 @@ export default function LoginMethodStep() {
     setError(null);
     try {
       await loginWithCode({ code });
-      let wallet = user?.wallet;
-      if (!wallet) {
-        console.log("no wallet, creating")
-        wallet = await createWallet();
-      }
     } catch {
       setError(t("onboarding.liveness.error"));
     }
@@ -188,14 +164,23 @@ export default function LoginMethodStep() {
               <Mail size={20} />
               {t("onboarding.loginMethod.emailButton")}
             </Button>
-            <Button 
-              variant="secondary" 
-              onClick={handlePasskey} 
-              disabled={hasPasskeyAccount === null || passkeyBusy || signupPasskeyBusy}
+            <Button
+              variant="secondary"
+              onClick={handlePasskeyLogin}
+              disabled={passkeyBusy || signupPasskeyBusy}
             >
               <Fingerprint size={20} />
               {t("onboarding.loginMethod.passkeyButton")}
             </Button>
+            <button
+              type="button"
+              onClick={handlePasskeySignup}
+              disabled={passkeyBusy || signupPasskeyBusy}
+              style={typography.body2}
+              className="py-2 text-primary disabled:opacity-50"
+            >
+              {t("onboarding.loginMethod.passkeySignupButton")}
+            </button>
           </>
         )}
         {step === "email" && (
