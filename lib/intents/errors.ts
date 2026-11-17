@@ -10,8 +10,8 @@ export type IntentsErrorKey =
   | "intents.errors.sessionCheck"
   | "withdrawFlow.errors.recipient";
 
-/** What the quote route answers when the body fails our own validation; the user can't fix that. */
-const INVALID_QUOTE_REQUEST = "Invalid quote request";
+/** What the quote and persistent-address routes answer when the body fails our own validation; the user can't fix that. */
+const INVALID_REQUESTS = ["Invalid quote request", "Invalid persistent address request"];
 /** What the guard answers when Privy couldn't be reached to check the session. */
 const SESSION_CHECK_UNAVAILABLE = "Could not check your session";
 
@@ -40,7 +40,7 @@ export function errorKey(err: unknown): IntentsErrorKey | null {
       return "intents.errors.unavailable";
   }
   if (err.status === 422 && RECIPIENT_REFUSALS.includes(err.message)) return "withdrawFlow.errors.recipient";
-  if (err.status === 400 && err.message === INVALID_QUOTE_REQUEST) return "intents.errors.generic";
+  if (err.status === 400 && INVALID_REQUESTS.includes(err.message)) return "intents.errors.generic";
   if (err.status >= 400 && err.status < 500) return null;
   return "intents.errors.generic";
 }

@@ -9,6 +9,7 @@ import { Screen } from "@/components/ui/screen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RadioCard } from "@/components/ui/radio-card";
+import { PersistentDeposit } from "@/components/cashflow/persistent-deposit";
 import { typography } from "@/constants/typography";
 
 import { FLAGS } from "@/lib/flags";
@@ -19,6 +20,7 @@ import { buildQuoteRequest, parseAmount, refundModeFrom, type Refund } from "@/l
 import { depositFromQuote, saveDeposit } from "@/lib/intents/deposits";
 import { fetchTokens, requestDepositQuote } from "@/lib/intents/api";
 import { errorKey } from "@/lib/intents/errors";
+import { usesPersistentAddress } from "@/lib/intents/persistent";
 
 const REFUND_MODE = refundModeFrom(process.env.NEXT_PUBLIC_INTENTS_REFUND_MODE);
 
@@ -28,7 +30,10 @@ export default function NetworkAssetPage() {
   const { network: networkParam } = useParams<{ network: string }>();
   // Validate before any other hook runs; notFound() throws, so it can't sit above hooks.
   if (!isNetworkId(networkParam)) notFound();
-  return <AssetAndAmount network={findNetwork(networkParam)} />;
+  const network = findNetwork(networkParam);
+  // Tron gets one permanent address per user; the other networks quote a one-time address per deposit.
+  if (usesPersistentAddress(network.id)) return <PersistentDeposit network={network} />;
+  return <AssetAndAmount network={network} />;
 }
 
 function AssetAndAmount({ network }: { network: Network }) {

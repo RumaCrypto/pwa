@@ -3,7 +3,14 @@ import { tokenList, type IntentsToken } from "./networks";
 
 export const AURORA_API_URL = "https://intents-api.aurora.dev";
 
-type Endpoint = "tokens" | "quote" | "status" | "deposit/submit";
+type Endpoint =
+  | "tokens"
+  | "quote"
+  | "status"
+  | "deposit/submit"
+  | "persistent-deposit-address"
+  | "persistent-deposit-address-data"
+  | "persistent-deposit-status";
 
 export function auroraUrl(endpoint: Endpoint, apiKey: string, query?: Record<string, string>): string {
   const url = new URL(`/api/${endpoint}/${encodeURIComponent(apiKey)}`, AURORA_API_URL);
