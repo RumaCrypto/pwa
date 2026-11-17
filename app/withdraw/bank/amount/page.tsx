@@ -20,12 +20,14 @@ import { useWithdraw } from "@/lib/withdraw/withdraw-context";
 import { useRate } from "@/lib/money/rates";
 import { useMoney } from "@/lib/money/money-context";
 import { appendDecimal, appendDigit, backspace, formatDraft, toMoney } from "@/lib/money/amount-input";
-import { convert, fromDecimalString } from "@/lib/money/money";
+import { convert } from "@/lib/money/money";
 import { buildQuote } from "@/lib/send/quote";
 import { useUsdcBalance } from "@/hooks/use-usdc-balance";
+import { balanceToMoney, fitsBalance, maxSend, shareOfMax, toDraft } from "@/lib/withdraw/amount";
 import { usePrivy } from "@privy-io/react-auth";
 
-const QUICK = [20, 50, 100];
+/** Shares of the most the user can send once the fee is counted; 100 is "Max". */
+const SHARES = [25, 50, 100] as const;
 
 export default function WithdrawAmountStep() {
   const router = useRouter();
@@ -34,7 +36,7 @@ export default function WithdrawAmountStep() {
   const { details, draft, setDraft, setQuote } = useWithdraw();
   const { format } = useMoney();
   const { user } = usePrivy();
-  const { balance } = useUsdcBalance(user?.wallet?.address);
+  const { balance, error: balanceError } = useUsdcBalance(user?.wallet?.address);
 
   const target = (country && currencyForCountry(country)) || "USD";
   // Sell-side rate, since this quotes what the user gets for selling USDC.
@@ -51,7 +53,10 @@ export default function WithdrawAmountStep() {
 
   const send = toMoney(draft, "USD");
   const receive = rate !== null ? convert(send, rate, target) : null;
-  const overBalance = balance !== null && send.amount > fromDecimalString(balance, "USD").amount;
+  const available = balance !== null ? balanceToMoney(balance) : null;
+  // The fee leaves the balance too, so the check is on the total, not just the send.
+  const overBalance = available !== null && !fitsBalance(send, available);
+  const canUseShares = available !== null && maxSend(available).amount > 0n;
   const ready = send.amount > 0n && rate !== null && !overBalance;
 
   const separator =
@@ -98,6 +103,39 @@ export default function WithdrawAmountStep() {
           <small className="text-3xl opacity-50">$</small>
           {formatDraft(draft, LOCALES[language], "USD") || "0"}
         </p>
+        {/* What can actually leave once the fee is counted, next to the shortcuts that use it. */}
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <p style={typography.body4} className="whitespace-nowrap text-text-secondary">
+            {available !== null ? (
+              t("withdrawFlow.amount.available", { amount: format(maxSend(available)) })
+            ) : balanceError ? (
+              t("withdrawFlow.amount.available", { amount: "—" })
+            ) : (
+              <span aria-label={t("common.loading")} className="inline-block h-4 w-28 animate-pulse rounded bg-card align-middle" />
+            )}
+          </p>
+          <div className="flex shrink-0 gap-1">
+            {SHARES.map((percent) => {
+              const share = available ? shareOfMax(available, percent) : null;
+              const active = draft !== "" && share !== null && share.amount === send.amount;
+              return (
+                <button
+                  key={percent}
+                  disabled={!canUseShares}
+                  aria-pressed={active}
+                  onClick={() => share && setDraft(toDraft(share))}
+                  style={typography.label4}
+                  className={clsx(
+                    "h-8 rounded-full border px-2.5 transition-colors disabled:opacity-40",
+                    active ? "border-primary bg-primary-light text-primary-dark" : "border-border-light bg-white active:bg-card"
+                  )}
+                >
+                  {percent === 100 ? t("withdrawFlow.form.max") : `${percent}%`}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="my-4 border-t border-border-light" />
 
@@ -127,20 +165,8 @@ export default function WithdrawAmountStep() {
         </p>
       )}
 
-      <div className="mt-5 grid grid-cols-3 gap-3">
-        {QUICK.map((value) => (
-          <button
-            key={value}
-            onClick={() => setDraft(String(value))}
-            style={typography.label1}
-            className="h-12 rounded-xl border border-border-light bg-white active:bg-card"
-          >
-            ${value}
-          </button>
-        ))}
-      </div>
 
-      <div className="mt-3">
+      <div className="mt-5">
         <Keypad
           decimalSeparator={separator}
           backspaceLabel={t("common.back")}
