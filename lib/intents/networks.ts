@@ -115,6 +115,11 @@ export function assetsForNetwork(tokens: readonly IntentsToken[], network: Netwo
   }));
 }
 
+/** The deposit symbols a network offers, as shown, without needing the token list. */
+export function depositSymbols(network: NetworkId): string[] {
+  return ALLOWED_SYMBOLS[network].map((symbol) => DISPLAY_SYMBOL[symbol] ?? symbol);
+}
+
 export function withdrawAssetsForNetwork(tokens: readonly IntentsToken[], network: NetworkId): WithdrawAsset[] {
   return pickTokens(tokens, network, WITHDRAW_SYMBOLS[network]).map((token) => ({
     assetId: token.assetId,

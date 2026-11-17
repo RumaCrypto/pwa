@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   IntentsApiError,
   fetchDepositStatus,
+  fetchPersistentHistory,
   fetchTokens,
   requestDepositQuote,
+  requestPersistentAddress,
   requestWithdrawEstimate,
   requestWithdrawQuote,
   submitDepositTx,
@@ -107,5 +109,36 @@ describe("fetchTokens", () => {
 
   it("fails loudly on a body with no token list", async () => {
     await expect(fetchTokens("tok", json(200, { asset_stats: [] }))).rejects.toThrow(/token list/);
+  });
+});
+
+describe("requestPersistentAddress", () => {
+  it("posts the network and wallet to our route and returns the address", async () => {
+    const fetchImpl = json(200, { depositAddress: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" });
+    const result = await requestPersistentAddress("tron", "0x5aeda56215b167893e80b4fe645ba6d5bab767de", "tok", fetchImpl);
+    expect(result).toEqual({ depositAddress: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" });
+    const [url, init] = vi.mocked(fetchImpl).mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/intents/persistent-address");
+    expect(JSON.parse(init.body as string)).toEqual({ network: "tron", recipient: "0x5aeda56215b167893e80b4fe645ba6d5bab767de" });
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok");
+  });
+
+  it("keeps the status of a refusal", async () => {
+    await expect(requestPersistentAddress("tron", "0x1", null, json(403, { error: "Recipient must be your own wallet" }))).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+});
+
+describe("fetchPersistentHistory", () => {
+  it("reads the history of an address", async () => {
+    const fetchImpl = json(200, { received: [], success: [], failed: [], incomplete: false });
+    expect(await fetchPersistentHistory("TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", null, fetchImpl)).toEqual({
+      received: [],
+      success: [],
+      failed: [],
+      incomplete: false,
+    });
+    expect(vi.mocked(fetchImpl).mock.calls[0][0]).toBe("/api/intents/persistent-status?address=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t");
   });
 });

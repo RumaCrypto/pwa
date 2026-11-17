@@ -10,6 +10,8 @@ import {
   type WithdrawQuoteRequest,
 } from "./quote";
 import { parseStatusResponse, type StatusResult } from "./status";
+import { parsePersistentAddress, parsePersistentHistory, type PersistentAddress, type PersistentHistory } from "./persistent";
+import type { NetworkId } from "./networks";
 
 /** Keeps the HTTP status so the screen can tell our own refusals from Aurora's messages. */
 export class IntentsApiError extends Error {
@@ -109,4 +111,25 @@ export async function submitDepositTx(
   fetchImpl: typeof fetch = fetch
 ): Promise<void> {
   await postJson("/api/intents/submit", { txHash, depositAddress }, accessToken, fetchImpl);
+}
+
+/** The user's permanent deposit address on `network`; asking again returns the same one. */
+export async function requestPersistentAddress(
+  network: NetworkId,
+  recipient: string,
+  accessToken: string | null,
+  fetchImpl: typeof fetch = fetch
+): Promise<PersistentAddress> {
+  return parsePersistentAddress(await postJson("/api/intents/persistent-address", { network, recipient }, accessToken, fetchImpl), network);
+}
+
+export async function fetchPersistentHistory(
+  address: string,
+  accessToken: string | null,
+  fetchImpl: typeof fetch = fetch
+): Promise<PersistentHistory> {
+  const query = new URLSearchParams({ address });
+  const response = await fetchImpl(`/api/intents/persistent-status?${query}`, { headers: authHeaders(accessToken) });
+  if (!response.ok) throw await errorFrom(response);
+  return parsePersistentHistory(await response.json());
 }

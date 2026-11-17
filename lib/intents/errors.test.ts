@@ -16,6 +16,7 @@ describe("errorKey", () => {
 
   it("treats our own validation failure as a generic error, since the user cannot fix it", () => {
     expect(errorKey(api(400, "Invalid quote request"))).toBe("intents.errors.generic");
+    expect(errorKey(api(400, "Invalid persistent address request"))).toBe("intents.errors.generic");
   });
 
   it("shows Aurora's own 4xx message as-is, e.g. an amount below its minimum", () => {
