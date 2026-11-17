@@ -5,9 +5,11 @@ import {
   buildDepositHistory,
   buildPersistentAddressRequest,
   formatTransfer,
+  isBelowMinimum,
   parsePersistentAddress,
   parsePersistentHistory,
   parsePersistentTransfers,
+  persistentTerms,
   usesPersistentAddress,
   validatePersistentAddressBody,
   type PersistentTransfer,
@@ -17,7 +19,10 @@ const USER = "0x5aeda56215b167893e80b4fe645ba6d5bab767de";
 const TRON_ADDRESS = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 const USDT_TRON = "nep141:tron-d28a265909efecdcee7c5028585214ea0b96f015.omft.near";
 
+const TRX = "nep141:tron.omft.near";
+
 const TOKENS = [
+  { assetId: TRX, decimals: 6, blockchain: "tron", symbol: "TRX", price: 0.3, contractAddress: null },
   { assetId: USDT_TRON, decimals: 6, blockchain: "tron", symbol: "USDT", price: 1, contractAddress: null },
   { assetId: USDC_BASE_ASSET_ID, decimals: 6, blockchain: "base", symbol: "USDC", price: 1, contractAddress: null },
 ] satisfies IntentsToken[];
@@ -186,5 +191,49 @@ describe("depositSymbols", () => {
   it("lists what the Tron screen asks for", () => {
     expect(depositSymbols("tron")).toEqual(["USDT", "TRX"]);
     expect(depositSymbols("near")).toEqual(["USDC", "USDT", "NEAR"]);
+  });
+});
+
+describe("persistentTerms", () => {
+  it("states Tron's minimums and fee, and nothing for networks without a permanent address", () => {
+    expect(persistentTerms("tron")).toEqual({
+      minimums: [
+        { symbol: "USDT", amount: "3" },
+        { symbol: "TRX", amount: "10" },
+      ],
+      feeUsd: "1.50",
+    });
+    expect(persistentTerms("eth")).toBeNull();
+  });
+});
+
+describe("isBelowMinimum", () => {
+  const terms = persistentTerms("tron");
+  const at = "2026-11-17T10:00:00Z";
+
+  it("compares against the minimum of the deposit's own asset", () => {
+    expect(isBelowMinimum(transfer("a", at, "2999999"), TOKENS, terms)).toBe(true);
+    expect(isBelowMinimum(transfer("b", at, "3000000"), TOKENS, terms)).toBe(false);
+    expect(isBelowMinimum(transfer("c", at, "9000000", TRX), TOKENS, terms)).toBe(true);
+    expect(isBelowMinimum(transfer("d", at, "10000000", TRX), TOKENS, terms)).toBe(false);
+  });
+
+  it("says no when it can't tell, rather than calling a deposit stuck", () => {
+    expect(isBelowMinimum(transfer("a", at, "1", "nep141:unknown"), TOKENS, terms)).toBe(false);
+    expect(isBelowMinimum(transfer("b", at, "1"), [], terms)).toBe(false);
+    expect(isBelowMinimum(transfer("c", at, "1"), TOKENS, null)).toBe(false);
+  });
+});
+
+describe("buildDepositHistory with a minimum", () => {
+  it("keeps a too-small deposit out of the pairing, so the next deposit gets its own payout", () => {
+    const small = transfer("in1", "2026-11-17T10:00:00Z", "2000000");
+    const big = transfer("in2", "2026-11-17T10:05:00Z", "25000000");
+    const payout = transfer("out1", "2026-11-17T10:07:00Z", "23500000", USDC_BASE_ASSET_ID);
+    const below = (t: PersistentTransfer) => isBelowMinimum(t, TOKENS, persistentTerms("tron"));
+    expect(buildDepositHistory({ received: [small, big], success: [payout], failed: [] }, below)).toEqual([
+      { deposit: big, status: "completed", payout },
+      { deposit: small, status: "belowMinimum" },
+    ]);
   });
 });

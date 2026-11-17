@@ -1,4 +1,4 @@
-import { formatUnits, getAddress, isAddress } from "viem";
+import { formatUnits, getAddress, isAddress, parseUnits } from "viem";
 import { isValidNetworkAddress } from "./addresses";
 import { USDC_BASE_ASSET_ID, isNetworkId, type IntentsToken, type NetworkId } from "./networks";
 
@@ -13,6 +13,39 @@ const PERSISTENT_NETWORKS: ReadonlySet<NetworkId> = new Set<NetworkId>(["tron"])
 
 export function usesPersistentAddress(network: NetworkId): boolean {
   return PERSISTENT_NETWORKS.has(network);
+}
+
+export interface DepositMinimum {
+  /** As Aurora's token list names it, e.g. "USDT". */
+  symbol: string;
+  /** In whole units, e.g. "3". */
+  amount: string;
+}
+
+export interface PersistentTerms {
+  /** Anything smaller sits in the address unconverted. */
+  minimums: readonly DepositMinimum[];
+  /** Roughly what a conversion costs, in USD; it moves with network fees. */
+  feeUsd: string;
+}
+
+/**
+ * Aurora's API reports neither for persistent addresses (a quote's error only
+ * gives the bridge floor, which is lower), so these are the figures confirmed
+ * by investigating deposits. Update them here when Aurora's change.
+ */
+const PERSISTENT_TERMS: Partial<Record<NetworkId, PersistentTerms>> = {
+  tron: {
+    minimums: [
+      { symbol: "USDT", amount: "3" },
+      { symbol: "TRX", amount: "10" },
+    ],
+    feeUsd: "1.50",
+  },
+};
+
+export function persistentTerms(network: NetworkId): PersistentTerms | null {
+  return PERSISTENT_TERMS[network] ?? null;
 }
 
 /** What the app sends to /api/intents/persistent-address. */
@@ -142,7 +175,7 @@ export function parsePersistentHistory(body: unknown): PersistentHistory {
   };
 }
 
-export type HistoryStatus = "converting" | "completed" | "failed";
+export type HistoryStatus = "converting" | "completed" | "failed" | "belowMinimum";
 
 export interface HistoryEntry {
   deposit: PersistentTransfer;
@@ -159,9 +192,13 @@ const PAIRING_SKEW_MS = 60_000;
  * linking the two. Each deposit is converted and paid out on its own, in the
  * order it arrived, so they are paired first-in, first-out: the oldest deposit
  * with the oldest payout made after it. Deposits without one are still
- * converting. Newest first, as the screen lists them.
+ * converting. Deposits below the minimum are left out of the pairing, since
+ * they stay unconverted. Newest first, as the screen lists them.
  */
-export function buildDepositHistory(history: Pick<PersistentHistory, "received" | "success" | "failed">): HistoryEntry[] {
+export function buildDepositHistory(
+  history: Pick<PersistentHistory, "received" | "success" | "failed">,
+  belowMinimum: (deposit: PersistentTransfer) => boolean = () => false
+): HistoryEntry[] {
   const byTime = (a: PersistentTransfer, b: PersistentTransfer) => a.createdAt.getTime() - b.createdAt.getTime();
   const deposits = [...history.received].sort(byTime);
   const outcomes = [
@@ -171,6 +208,8 @@ export function buildDepositHistory(history: Pick<PersistentHistory, "received" 
 
   let next = 0;
   const entries: HistoryEntry[] = deposits.map((deposit) => {
+    // Never converted, so never paid out: pairing it would hand it the next deposit's payout.
+    if (belowMinimum(deposit)) return { deposit, status: "belowMinimum" };
     // A payout logged before this deposit belongs to an earlier one that was not listed (e.g. a page cut off).
     while (next < outcomes.length && outcomes[next].payout.createdAt.getTime() < deposit.createdAt.getTime() - PAIRING_SKEW_MS) {
       next += 1;
@@ -205,4 +244,17 @@ export function formatTransfer(transfer: PersistentTransfer, tokens: readonly In
     amount = trimmed ? `${whole}.${trimmed}` : whole;
   }
   return symbol ? `${amount} ${symbol}` : amount;
+}
+
+/**
+ * Whether a deposit is below its asset's minimum, so it will not be converted.
+ * False when the asset or its decimals are unknown: "converting" is the safer
+ * thing to show than telling someone their money is stuck.
+ */
+export function isBelowMinimum(transfer: PersistentTransfer, tokens: readonly IntentsToken[], terms: PersistentTerms | null): boolean {
+  const token = tokenFor(tokens, transfer.assetId);
+  const minimum = token && terms?.minimums.find((m) => m.symbol === token.symbol);
+  const decimals = transfer.decimals ?? token?.decimals ?? null;
+  if (!minimum || decimals === null || !/^\d+$/.test(transfer.amount)) return false;
+  return BigInt(transfer.amount) < parseUnits(minimum.amount, decimals);
 }

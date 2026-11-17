@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Badge } from "@/components/ui/badge";
 import { ListRow } from "@/components/ui/list-row";
+import { DetailRow } from "@/components/ui/detail-row";
 import { QrCode } from "@/components/ui/qr-code";
 import { AddressChunks } from "@/components/cashflow/address-chunks";
 import { typography } from "@/constants/typography";
@@ -18,10 +19,20 @@ import { typography } from "@/constants/typography";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { LOCALES } from "@/lib/i18n/languages";
 import { formatDayAndTime } from "@/lib/datetime";
+import { formatMoney } from "@/lib/money/format";
+import { fromDecimalString } from "@/lib/money/money";
 import { fetchTokens, requestPersistentAddress } from "@/lib/intents/api";
 import { errorKey } from "@/lib/intents/errors";
 import { depositSymbols, type IntentsToken, type Network } from "@/lib/intents/networks";
-import { buildDepositHistory, formatTransfer, type HistoryEntry, type PersistentAddress } from "@/lib/intents/persistent";
+import {
+  buildDepositHistory,
+  formatTransfer,
+  isBelowMinimum,
+  persistentTerms,
+  type HistoryEntry,
+  type PersistentAddress,
+  type PersistentTerms,
+} from "@/lib/intents/persistent";
 import { usePersistentHistory } from "@/lib/intents/use-persistent-history";
 
 /**
@@ -66,7 +77,8 @@ export function PersistentDeposit({ network }: { network: Network }) {
   }, [getAccessToken]);
 
   const { history, failed: historyFailed } = usePersistentHistory(address?.depositAddress ?? null);
-  const entries = history ? buildDepositHistory(history) : null;
+  const terms = persistentTerms(network.id);
+  const entries = history ? buildDepositHistory(history, (deposit) => isBelowMinimum(deposit, tokens, terms)) : null;
 
   const params = {
     network: network.name,
@@ -129,6 +141,8 @@ export function PersistentDeposit({ network }: { network: Network }) {
           {/* Sending another asset or on another network loses the funds, so this is a warning, not a hint. */}
           <Callout>{t("intents.persistent.warning", params)}</Callout>
 
+          {terms && <DepositTerms terms={terms} />}
+
           <div className="mt-5 flex justify-center">
             <QrCode value={address.depositAddress} label={t("intents.persistent.address", params)} />
           </div>
@@ -164,6 +178,25 @@ export function PersistentDeposit({ network }: { network: Network }) {
   );
 }
 
+/** Shown before the user copies the address: a deposit under the minimum is never converted. */
+function DepositTerms({ terms }: { terms: PersistentTerms }) {
+  const { t, language } = useI18n();
+  const minimums = new Intl.ListFormat(LOCALES[language], { type: "disjunction" }).format(
+    terms.minimums.map((m) => `${m.amount} ${m.symbol}`)
+  );
+  const fee = formatMoney(fromDecimalString(terms.feeUsd, "USD"), language);
+
+  return (
+    <Card className="mt-4 px-5 py-3">
+      <DetailRow label={t("intents.persistent.minimum")} value={minimums} />
+      <DetailRow label={t("intents.persistent.fee")} value={`~${fee}`} />
+      <p style={typography.body5} className="pt-1 pb-2 text-text-secondary">
+        {t("intents.persistent.minimumHint", { minimums })}
+      </p>
+    </Card>
+  );
+}
+
 function DepositHistory({
   entries,
   tokens,
@@ -189,6 +222,7 @@ function DepositHistory({
     converting: <Badge variant="outline">{t("intents.persistent.converting")}</Badge>,
     completed: <Badge variant="light">{t("intents.persistent.completed")}</Badge>,
     failed: <Badge variant="dark">{t("intents.persistent.failed")}</Badge>,
+    belowMinimum: <Badge variant="dark">{t("intents.persistent.belowMinimum")}</Badge>,
   };
 
   return (
@@ -211,7 +245,9 @@ function DepositHistory({
                 ? `${when} · ${t("intents.persistent.receivedAs", { amount: formatTransfer(entry.payout, tokens) })}`
                 : entry.status === "failed"
                   ? `${when} · ${t("intents.persistent.failedHint")}`
-                  : when;
+                  : entry.status === "belowMinimum"
+                    ? `${when} · ${t("intents.persistent.belowMinimumHint")}`
+                    : when;
             return (
               <ListRow
                 // One transaction can carry two transfers, so the hash alone may repeat.
