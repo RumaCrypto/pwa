@@ -8,6 +8,7 @@ import { Screen } from "@/components/ui/screen";
 import { Button } from "@/components/ui/button";
 import { RadioCard } from "@/components/ui/radio-card";
 import { DetailRow } from "@/components/ui/detail-row";
+import { PriceBadge } from "@/components/price/price-badge";
 import { typography } from "@/constants/typography";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
@@ -48,6 +49,8 @@ export default function WithdrawScreen() {
       <h2 style={typography.display3} className="mb-6">
         {t("cashflow.out.question")}
       </h2>
+
+      <PriceBadge side="sell" href="/withdraw/price" className="mb-6" />
 
       <div role="radiogroup" className="flex flex-col gap-3">
         {methods.map((option) => (

@@ -32,6 +32,11 @@ export function p2pSupports(currency: CurrencyCode): boolean {
   return currency === "USD" || currency in SDK_CURRENCY;
 }
 
+/** Whether p2p.me runs a corridor in this country's own fiat, i.e. quotes it a real buy/sell price. */
+export function p2pQuotesCountry(country: string, currency: CurrencyCode): boolean {
+  return country in SDK_CURRENCY_BY_COUNTRY || currency in SDK_CURRENCY;
+}
+
 /** `sellPrice` is always fixed-point at 6 decimals, regardless of the fiat's own precision. */
 const SELL_PRICE_DECIMALS = 6;
 
