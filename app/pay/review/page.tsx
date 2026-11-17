@@ -15,7 +15,8 @@ import { LOCALES } from "@/lib/i18n/languages";
 import { useMoney } from "@/lib/money/money-context";
 import { usePay } from "@/lib/pay/pay-context";
 import { countryName } from "@/lib/contacts/contacts";
-import { useLimits } from "@/lib/limits/limits-context";
+import { usePrivy } from "@privy-io/react-auth";
+import { useTxLimits } from "@/hooks/use-tx-limits";
 import { useP2pWalletClient } from "@/hooks/use-p2p-wallet-client";
 
 export default function PayReviewScreen() {
@@ -23,7 +24,9 @@ export default function PayReviewScreen() {
   const { t, language } = useI18n();
   const { quote, placeOrder, reset } = usePay();
   const { format } = useMoney();
-  const { limits, recordCompletedSend } = useLimits();
+  const { user } = usePrivy();
+  // The business is paid in its own corridor, so that is the limit that applies.
+  const { limits } = useTxLimits(user?.wallet?.address, quote?.country);
   const getWalletClient = useP2pWalletClient();
 
   const [submitting, setSubmitting] = useState(false);
@@ -37,7 +40,8 @@ export default function PayReviewScreen() {
 
   if (!quote) return null;
 
-  const overLimit = quote.usdc.amount > limits.perSend.amount;
+  const sellLimit = limits && limits.sell.currency === quote.local.currency ? limits.sell : null;
+  const overLimit = sellLimit !== null && quote.local.amount > sellLimit.amount;
 
   const handleConfirm = async () => {
     setError(null);
@@ -45,7 +49,6 @@ export default function PayReviewScreen() {
     try {
       const { walletClient, address } = await getWalletClient();
       const order = await placeOrder({ quote, walletClient, userAddress: address });
-      recordCompletedSend();
       reset();
       router.replace(`/pay/${order.id}`);
     } catch (err) {
@@ -97,7 +100,7 @@ export default function PayReviewScreen() {
 
       {overLimit && (
         <p style={typography.body4} className="mt-3 text-danger">
-          {t("sendFlow.step2.overLimit", { limit: format(limits.perSend) })}
+          {t("sendFlow.step2.overLimit", { limit: format(sellLimit!) })}
         </p>
       )}
 

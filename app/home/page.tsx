@@ -51,6 +51,9 @@ export default function HomePage() {
   const { entries } = useActivity(address);
   const { contacts } = useContacts();
   const { limits } = useLimits();
+  // A dash, not a guessed default, until the contract has answered.
+  const sendLimit = limits ? format(limits.sell) : "-";
+  const limitLevel = limits?.level ?? "-";
   const { setContactId } = useSend();
   const [addingContact, setAddingContact] = useState(false);
   const [addressCopied, setAddressCopied] = useState(false);
@@ -216,10 +219,10 @@ export default function HomePage() {
         <Card className="flex items-center gap-3 px-4 py-4">
           <div className="min-w-0 flex-1">
             <p style={typography.heading4}>
-              {t("home.limit.title", { amount: format(limits.perSend) })}
+              {t("home.limit.title", { amount: sendLimit })}
             </p>
             <p style={typography.body4} className="mt-0.5 text-text-secondary">
-              {t("home.limit.subtitle", { level: limits.level, total: MAX_LEVEL })}
+              {t("home.limit.subtitle", { level: limitLevel, total: MAX_LEVEL })}
             </p>
           </div>
           <Badge variant="dark">{t("home.limit.action")}</Badge>

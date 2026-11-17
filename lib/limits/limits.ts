@@ -1,62 +1,29 @@
-import { fromNumber, type Money } from "@/lib/money/money";
+/**
+ * Levels are a user-facing summary of the Reputation Points (RP) p2p.me's
+ * Reputation Manager has credited to a wallet. RP is never shown as such:
+ * the user sees a level and the per-order limits the diamond reports.
+ *
+ * A BUY limit is RP × the corridor's USDC-per-RP multiplier (1 RP = 2 USDC
+ * outside India), so a wallet's RP is recovered from its on-chain buy limit.
+ * The top of the scale, 300 RP, is what lifts the buy limit to $600.
+ */
+export const MAX_RP = 300;
 
-export const SOCIAL_NETWORKS = ["instagram", "x", "github", "linkedin", "facebook"] as const;
-export type SocialNetwork = (typeof SOCIAL_NETWORKS)[number];
+/** Minimum RP for levels 1..4. Level 0 is a wallet with no RP at all. */
+export const LEVEL_THRESHOLDS = [1, 100, 200, MAX_RP] as const;
 
-/** Completed sends that earn the top level, on top of a verified document. */
-export const SENDS_FOR_TOP_LEVEL = 10;
+export const MAX_LEVEL = LEVEL_THRESHOLDS.length;
 
-/** What the user has handed over so far. Nothing is required to open an account. */
-export interface Verifications {
-  socials: SocialNetwork[] | string[];
-  document: boolean;
-  completedSends: number;
+export function levelForRp(rp: number): number {
+  let level = 0;
+  for (const threshold of LEVEL_THRESHOLDS) {
+    if (rp >= threshold) level += 1;
+  }
+  return level;
 }
 
-export interface Limits {
-  level: number;
-  perSend: Money;
-  perDay: Money;
-  sendsPerDay: number;
-}
-
-export const LEVELS: Limits[] = [
-  { level: 1, perSend: fromNumber(300, "USD"), perDay: fromNumber(3_000, "USD"), sendsPerDay: 10 },
-  { level: 2, perSend: fromNumber(375, "USD"), perDay: fromNumber(3_750, "USD"), sendsPerDay: 10 },
-  { level: 3, perSend: fromNumber(475, "USD"), perDay: fromNumber(5_750, "USD"), sendsPerDay: 10 },
-  { level: 4, perSend: fromNumber(675, "USD"), perDay: fromNumber(6_750, "USD"), sendsPerDay: 10 },
-];
-
-export const MAX_LEVEL = LEVELS.length;
-
-export type RaiseStep = "social" | "document" | "usage";
-
-export function levelFor(verifications: Verifications): number {
-  const { socials, document, completedSends } = verifications;
-
-  // The document is the gate for anything above level two: a record of use
-  // raises trust, but it does not stand in for identity.
-  if (document && completedSends >= SENDS_FOR_TOP_LEVEL) return 4;
-  if (document) return 3;
-  if (socials.length > 0) return 2;
-  return 1;
-}
-
-export function limitsFor(level: number): Limits {
-  return LEVELS[Math.min(Math.max(level, 1), MAX_LEVEL) - 1];
-}
-
-/** The one thing worth doing next, or null at the top. */
-export function nextStepFor(verifications: Verifications): RaiseStep | null {
-  if (verifications.socials.length === 0 && !verifications.document) return "social";
-  if (!verifications.document) return "document";
-  if (verifications.completedSends < SENDS_FOR_TOP_LEVEL) return "usage";
-  return null;
-}
-
-/** Ceiling each step unlocks, for the badges on the limits screen. */
-export function rewardFor(step: RaiseStep): Money | null {
-  if (step === "social") return limitsFor(2).perSend;
-  if (step === "document") return limitsFor(3).perSend;
-  return null;
+/** RP behind a buy limit, given the corridor's USDC granted per RP. */
+export function rpFromBuyLimit(buyLimitUsdc: number, usdcPerRp: number): number {
+  if (!(usdcPerRp > 0) || !(buyLimitUsdc > 0)) return 0;
+  return Math.round(buyLimitUsdc / usdcPerRp);
 }
