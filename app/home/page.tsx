@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { ArrowDownLeft, ArrowUpRight, Check, Copy, Plus, Settings, Store } from "lucide-react";
@@ -15,10 +15,12 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { ListRow } from "@/components/ui/list-row";
+import { PullIndicator } from "@/components/ui/pull-indicator";
 import { typography } from "@/constants/typography";
 
 import { useI18n } from "@/lib/i18n/i18n-context";
 import { useUsdcBalance } from "@/hooks/use-usdc-balance";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useConverted, useMoney } from "@/lib/money/money-context";
 import { fromDecimalString, fromMinor } from "@/lib/money/money";
 import { useContacts } from "@/lib/contacts/contacts-context";
@@ -43,12 +45,14 @@ export default function HomePage() {
   const { displayName: ownName, username, email, setUsername } = useUsername();
   const [editingName, setEditingName] = useState(false);
 
-  const { balance, loading: balanceLoading } = useUsdcBalance(address);
+  const { balance, loading: balanceLoading, refetch: refetchBalance } = useUsdcBalance(address);
   const { format, formatParts } = useMoney();
   const usdBalance = balance ? fromDecimalString(balance, "USD") : fromMinor(0n, "USD");
   const { money: localBalance, loading: rateLoading } = useConverted(usdBalance);
 
-  const { entries } = useActivity(address);
+  const { entries, refetch: refetchActivity } = useActivity(address);
+  const refresh = useCallback(() => Promise.all([refetchBalance(), refetchActivity()]), [refetchBalance, refetchActivity]);
+  const { pull, refreshing } = usePullToRefresh(refresh);
   const { contacts } = useContacts();
   const { limits } = useLimits();
   // A dash, not a guessed default, until the contract has answered.
@@ -87,6 +91,8 @@ export default function HomePage() {
         </Button>
       }
     >
+      <PullIndicator pull={pull} refreshing={refreshing} label={t("common.refreshing")} />
+
       <header className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-col items-start gap-1">
           {/* The name is only a label; tapping always copies the full address, which is what people paste elsewhere. */}
