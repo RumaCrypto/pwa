@@ -57,8 +57,9 @@ export default function SendAmountStep() {
 
   const send = toMoney(draft, "USD");
   const receive = rate !== null ? convert(send, rate, target) : null;
-  const sellLimit = !isRuma && limits && receive && limits.sell.currency === receive.currency ? limits.sell : null;
-  const overLimit = sellLimit !== null && receive !== null && receive.amount > sellLimit.amount;
+  // The limit caps the USDC sold, not the fiat the contact receives.
+  const sellLimit = !isRuma && limits ? limits.sell : null;
+  const overLimit = sellLimit !== null && send.amount > sellLimit.amount;
   const ready = send.amount > 0n && rate !== null && !overLimit;
 
   const separator =

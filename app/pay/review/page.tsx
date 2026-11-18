@@ -40,8 +40,9 @@ export default function PayReviewScreen() {
 
   if (!quote) return null;
 
-  const sellLimit = limits && limits.sell.currency === quote.local.currency ? limits.sell : null;
-  const overLimit = sellLimit !== null && quote.local.amount > sellLimit.amount;
+  // The limit caps the USDC sold, not the fiat the business receives.
+  const sellLimit = limits ? limits.sell : null;
+  const overLimit = sellLimit !== null && quote.usdc.amount > sellLimit.amount;
 
   const handleConfirm = async () => {
     setError(null);

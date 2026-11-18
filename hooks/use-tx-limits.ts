@@ -6,14 +6,13 @@ import { isAddress, type Address } from "viem";
 import { p2pProfile } from "@/lib/send/p2p-profile";
 import { p2pPrices } from "@/lib/money/p2p-prices";
 import { sdkCurrencyForCountry } from "@/lib/contacts/contacts";
-import { localCurrencyForCountry } from "@/lib/deposit/quote";
 import { fromNumber, type Money } from "@/lib/money/money";
 import { levelForRp, rpFromBuyLimit } from "@/lib/limits/limits";
 
 export interface TxLimits {
   /** Largest single BUY (add money), in USDC. Zero until the user has RP. */
   buy: Money;
-  /** Largest single SELL (send/withdraw), in the country's local fiat. */
+  /** Largest single SELL (send/withdraw), in USDC — the amount sold, not its fiat payout. */
   sell: Money;
   /** 0..MAX_LEVEL, from the RP behind `buy`; null if the multiplier could not be read. */
   level: number | null;
@@ -51,7 +50,7 @@ export function useTxLimits(address: string | undefined, country: string | null 
       if (ratio.isErr()) console.error("Failed to read p2p.me RP multiplier", ratio.error);
       setLimits({
         buy: fromNumber(buyLimit, "USD"),
-        sell: fromNumber(sellLimit, localCurrencyForCountry(country)),
+        sell: fromNumber(sellLimit, "USD"),
         level: ratio.isOk() ? levelForRp(rpFromBuyLimit(buyLimit, ratio.value.multiplier)) : null,
       });
     } else {
