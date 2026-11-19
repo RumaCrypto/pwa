@@ -33,6 +33,13 @@ describe("maxSend", () => {
   it("is zero with an empty balance", () => {
     expect(maxSend(usd(0))).toEqual(usd(0));
   });
+
+  it("never goes past the sell limit when one is given", () => {
+    expect(maxSend(usd(1006), usd(300))).toEqual(usd(300));
+    // Below the limit, the balance is what binds.
+    expect(maxSend(usd(100.6), usd(300))).toEqual(usd(100));
+    expect(maxSend(usd(100.6), usd(0))).toEqual(usd(0));
+  });
 });
 
 describe("shareOfMax", () => {
@@ -42,6 +49,11 @@ describe("shareOfMax", () => {
     expect(shareOfMax(balance, 50)).toEqual(usd(50));
     expect(shareOfMax(balance, 100)).toEqual(usd(100));
     expect(shareOfMax(usd(0.05), 25)).toEqual(usd(0.01));
+  });
+
+  it("takes the share of the limit when the limit is below the balance", () => {
+    expect(shareOfMax(usd(1006), 25, usd(300))).toEqual(usd(75));
+    expect(shareOfMax(usd(1006), 100, usd(300))).toEqual(usd(300));
   });
 });
 
