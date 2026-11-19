@@ -23,6 +23,7 @@ import { appendDecimal, appendDigit, backspace, formatDraft, toMoney } from "@/l
 import { convert } from "@/lib/money/money";
 import { buildQuote } from "@/lib/send/quote";
 import { useUsdcBalance } from "@/hooks/use-usdc-balance";
+import { useLimits } from "@/lib/limits/limits-context";
 import { balanceToMoney, fitsBalance, maxSend, shareOfMax, toDraft } from "@/lib/withdraw/amount";
 import { usePrivy } from "@privy-io/react-auth";
 
@@ -37,6 +38,8 @@ export default function WithdrawAmountStep() {
   const { format } = useMoney();
   const { user } = usePrivy();
   const { balance, error: balanceError } = useUsdcBalance(user?.wallet?.address);
+  // The payout settles in the user's own corridor, which is what the shared limits read.
+  const { limits } = useLimits();
 
   const target = (country && currencyForCountry(country)) || "USD";
   // Sell-side rate, since this quotes what the user gets for selling USDC.
@@ -56,8 +59,13 @@ export default function WithdrawAmountStep() {
   const available = balance !== null ? balanceToMoney(balance) : null;
   // The fee leaves the balance too, so the check is on the total, not just the send.
   const overBalance = available !== null && !fitsBalance(send, available);
-  const canUseShares = available !== null && maxSend(available).amount > 0n;
-  const ready = send.amount > 0n && rate !== null && !overBalance;
+  // The limit caps the USDC sold, not the fiat paid out. Unknown until read; the contract stays the final word.
+  const sellLimit = limits ? limits.sell : null;
+  // What can actually go out: the balance after the fee, capped at the sell limit.
+  const max = available !== null ? maxSend(available, sellLimit) : null;
+  const canUseShares = max !== null && max.amount > 0n;
+  const overLimit = sellLimit !== null && send.amount > sellLimit.amount;
+  const ready = send.amount > 0n && rate !== null && !overBalance && !overLimit;
 
   const separator =
     new Intl.NumberFormat(LOCALES[language]).formatToParts(1.1).find((p) => p.type === "decimal")?.value ??
@@ -103,11 +111,11 @@ export default function WithdrawAmountStep() {
           <small className="text-3xl opacity-50">$</small>
           {formatDraft(draft, LOCALES[language], "USD") || "0"}
         </p>
-        {/* What can actually leave once the fee is counted, next to the shortcuts that use it. */}
+        {/* What can actually leave once the fee and the sell limit are counted, next to the shortcuts that use it. */}
         <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <p style={typography.body4} className="whitespace-nowrap text-text-secondary">
-            {available !== null ? (
-              t("withdrawFlow.amount.available", { amount: format(maxSend(available)) })
+            {max !== null ? (
+              t("withdrawFlow.amount.available", { amount: format(max) })
             ) : balanceError ? (
               t("withdrawFlow.amount.available", { amount: "—" })
             ) : (
@@ -116,7 +124,7 @@ export default function WithdrawAmountStep() {
           </p>
           <div className="flex shrink-0 gap-1">
             {SHARES.map((percent) => {
-              const share = available ? shareOfMax(available, percent) : null;
+              const share = available ? shareOfMax(available, percent, sellLimit) : null;
               const active = draft !== "" && share !== null && share.amount === send.amount;
               return (
                 <button
@@ -165,6 +173,11 @@ export default function WithdrawAmountStep() {
         </p>
       )}
 
+      {overLimit && !overBalance && (
+        <p style={typography.body4} className="mt-3 text-danger">
+          {t("sendFlow.step2.overLimit", { limit: format(sellLimit!) })}
+        </p>
+      )}
 
       <div className="mt-5">
         <Keypad
