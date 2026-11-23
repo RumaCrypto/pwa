@@ -114,13 +114,30 @@ export async function submitDepositTx(
 }
 
 /** The user's permanent deposit address on `network`; asking again returns the same one. */
-export async function requestPersistentAddress(
+/** Requests still waiting on Aurora, by network and wallet. */
+const persistentInFlight = new Map<string, Promise<PersistentAddress>>();
+
+/**
+ * Callers asking for the same address at once share one request: Aurora
+ * answers 429 to a second mint of an address that is still being created, and
+ * the deposit screen's effect can run twice (StrictMode, dependency changes).
+ * Once settled the entry is dropped, so a retry asks Aurora again.
+ */
+export function requestPersistentAddress(
   network: NetworkId,
   recipient: string,
   accessToken: string | null,
   fetchImpl: typeof fetch = fetch
 ): Promise<PersistentAddress> {
-  return parsePersistentAddress(await postJson("/api/intents/persistent-address", { network, recipient }, accessToken, fetchImpl), network);
+  const key = `${network}:${recipient.toLowerCase()}`;
+  const pending = persistentInFlight.get(key);
+  if (pending) return pending;
+
+  const request = postJson("/api/intents/persistent-address", { network, recipient }, accessToken, fetchImpl)
+    .then((body) => parsePersistentAddress(body, network))
+    .finally(() => persistentInFlight.delete(key));
+  persistentInFlight.set(key, request);
+  return request;
 }
 
 export async function fetchPersistentHistory(

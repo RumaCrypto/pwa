@@ -128,6 +128,28 @@ describe("requestPersistentAddress", () => {
       status: 403,
     });
   });
+
+  // The regression: the screen's effect runs twice (StrictMode, dependency
+  // changes) and Aurora answers 429 to a second mint of the same address while
+  // the first is in flight, so a new user saw "too many attempts".
+  it("sends one request when the same address is asked for concurrently", async () => {
+    const fetchImpl = json(200, { depositAddress: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" });
+    const wallet = "0x00000000000000000000000000000000000000aa";
+    const [first, second] = await Promise.all([
+      requestPersistentAddress("tron", wallet, "tok", fetchImpl),
+      requestPersistentAddress("tron", wallet, "tok", fetchImpl),
+    ]);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(first).toEqual(second);
+  });
+
+  it("asks again once the previous request has settled, so retrying after a failure works", async () => {
+    const wallet = "0x00000000000000000000000000000000000000bb";
+    await expect(requestPersistentAddress("tron", wallet, "tok", json(429, { error: "Too many requests" }))).rejects.toMatchObject({ status: 429 });
+    const retry = json(200, { depositAddress: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" });
+    await expect(requestPersistentAddress("tron", wallet, "tok", retry)).resolves.toEqual({ depositAddress: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" });
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("fetchPersistentHistory", () => {
