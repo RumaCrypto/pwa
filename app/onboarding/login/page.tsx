@@ -37,7 +37,8 @@ export default function LoginMethodStep() {
 
   // Sign-in and sign-up are separate actions: a local flag can't tell whether
   // the user already has a passkey (new device, installed PWA, cleared data).
-  // The embedded wallet is created by Privy's `createOnLogin` config.
+  // These headless hooks skip Privy's `createOnLogin`; the embedded wallet is
+  // created by <EnsureEmbeddedWallet /> in the Privy provider.
   const handlePasskeyLogin = async () => {
     setError(null);
     try {
