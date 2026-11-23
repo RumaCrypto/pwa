@@ -4,6 +4,7 @@ import { PrivyProvider as BasePrivyProvider } from "@privy-io/react-auth";
 import type { ReactNode } from "react";
 import { colors } from "@/constants/colors";
 import { DEFAULT_SETTLEMENT_NETWORK } from "@/constants/blockchain";
+import { EnsureEmbeddedWallet } from "./ensure-embedded-wallet";
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
 
@@ -24,7 +25,9 @@ export function PrivyProvider({ children }: { children: ReactNode }) {
         supportedChains: [DEFAULT_SETTLEMENT_NETWORK],
         embeddedWallets: {
           ethereum: {
-            createOnLogin: "users-without-wallets", // not useful if we are using custom hook calls
+            // Only applies to Privy's own modal; our headless login flows
+            // rely on <EnsureEmbeddedWallet /> below instead.
+            createOnLogin: "users-without-wallets",
           },
         },
         appearance: {
@@ -34,6 +37,7 @@ export function PrivyProvider({ children }: { children: ReactNode }) {
         },
       }}
     >
+      <EnsureEmbeddedWallet />
       {children}
     </BasePrivyProvider>
   );
