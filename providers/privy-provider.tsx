@@ -2,6 +2,7 @@
 
 import { PrivyProvider as BasePrivyProvider } from "@privy-io/react-auth";
 import type { ReactNode } from "react";
+import { baseSepolia } from "viem/chains";
 import { colors } from "@/constants/colors";
 import { DEFAULT_SETTLEMENT_NETWORK } from "@/constants/blockchain";
 import { EnsureEmbeddedWallet } from "./ensure-embedded-wallet";
@@ -22,7 +23,11 @@ export function PrivyProvider({ children }: { children: ReactNode }) {
       config={{
         loginMethods: ["email", "passkey"],
         defaultChain: DEFAULT_SETTLEMENT_NETWORK,
-        supportedChains: [DEFAULT_SETTLEMENT_NETWORK],
+        // Base Sepolia only in dev, for /dev/gas-sponsorship (issue #33).
+        supportedChains:
+          process.env.NODE_ENV === "production"
+            ? [DEFAULT_SETTLEMENT_NETWORK]
+            : [DEFAULT_SETTLEMENT_NETWORK, baseSepolia],
         embeddedWallets: {
           ethereum: {
             // Only applies to Privy's own modal; our headless login flows
