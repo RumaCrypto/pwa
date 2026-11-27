@@ -9,10 +9,17 @@ export interface Flags {
   card: boolean;
   /** Aurora Intents needs an API key from Intents Studio; without one, deposits from other networks would fail at the quote. */
   multichainDeposits: boolean;
+  /**
+   * Privy native gas sponsorship (EIP-7702 + paymaster) for every wallet-client
+   * transaction. Needs TEE wallets, "Sponsor gas fees" with Base enabled and
+   * client-side sponsorship allowed in the Privy dashboard (issue #33).
+   */
+  gasSponsorship: boolean;
 }
 
 export const FLAGS: Flags = {
   cashPoints: process.env.NEXT_PUBLIC_FEATURE_CASH_POINTS === "true",
   card: process.env.NEXT_PUBLIC_FEATURE_CARD === "true",
   multichainDeposits: process.env.NEXT_PUBLIC_FEATURE_MULTICHAIN_DEPOSITS === "true",
+  gasSponsorship: process.env.NEXT_PUBLIC_FEATURE_GAS_SPONSORSHIP === "true",
 };
